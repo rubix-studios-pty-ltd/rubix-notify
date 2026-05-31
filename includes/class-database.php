@@ -30,14 +30,14 @@ final class Ntfy_Database
     {
         global $wpdb;
 
-        return $wpdb->prefix . 'rx_notify_settings';
+        return $wpdb->prefix . 'rubix_notify_settings';
     }
 
     public static function templates_table(): string
     {
         global $wpdb;
 
-        return $wpdb->prefix . 'rx_notify_templates';
+        return $wpdb->prefix . 'rubix_notify_templates';
     }
 
     public static function activate(): void
