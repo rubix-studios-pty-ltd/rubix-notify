@@ -1,0 +1,21 @@
+{
+  "name": "rx-notify",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "wp-scripts start",
+    "build": "wp-scripts build"
+  },
+  "dependencies": {
+    "@wordpress/api-fetch": "^7.47.0",
+    "@wordpress/components": "^34.0.0",
+    "@wordpress/element": "^7.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.16",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "@wordpress/scripts": "^32.3.0",
+    "typescript": "^6.0.3"
+  }
+}
