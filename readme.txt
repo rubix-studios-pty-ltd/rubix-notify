@@ -71,6 +71,26 @@ No. This plugin sends notifications to ntfy. It does not send WordPress email al
 
 No. The plugin focuses on sending login notifications. It is not intended to be a full audit logging system.
 
+== Source Code and Build Instructions ==
+
+This plugin includes a compiled React admin asset at admin/index.js.
+
+The human-readable source code used to generate the compiled admin asset is publicly available at:
+
+https://github.com/rubix-studios-pty-ltd/rubix-notify
+
+To rebuild the compiled admin files:
+
+Clone the repository.
+Install dependencies with pnpm install.
+Build the admin assets with pnpm build.
+
+The generated admin JavaScript is output to admin/index.js.
+
+Third-party JavaScript dependencies are declared in package.json and locked in pnpm-lock.yaml.
+
+The public repository is provided so future maintainers, reviewers, and contributors can inspect, modify, and rebuild the React admin interface from source.
+
 == Changelog ==
 
 = 1.0.0 =
