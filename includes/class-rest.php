@@ -17,14 +17,27 @@ final class Ntfy_Rest
     {
         register_rest_route(self::NAMESPACE, '/settings', [
             [
-                'methods' => WP_REST_Server::READABLE,
-                'callback' => [self::class, 'get_settings'],
-                'permission_callback' => [self::class, 'can_manage'],
-            ],
-            [
                 'methods' => WP_REST_Server::CREATABLE,
                 'callback' => [self::class, 'save_settings'],
                 'permission_callback' => [self::class, 'can_manage'],
+                'args' => [
+                    'server_url' => [
+                        'type' => 'string',
+                        'required' => true,
+                    ],
+                    'include_user_agent' => [
+                        'type' => 'boolean',
+                        'required' => false,
+                    ],
+                    'auth_token' => [
+                        'type' => 'string',
+                        'required' => false,
+                    ],
+                    'clear_auth_token' => [
+                        'type' => 'boolean',
+                        'required' => false,
+                    ],
+                ],
             ],
         ]);
 

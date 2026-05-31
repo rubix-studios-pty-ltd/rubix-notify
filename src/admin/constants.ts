@@ -38,7 +38,7 @@ export const emptySettings: Settings = {
       tags: 'key',
     },
     login_failure: {
-      enabled: true,
+      enabled: false,
       topic: 'wordpress-{site_slug}',
       title: 'Failed WordPress login {username}',
       message: 'Failed login attempt for {username} on {site_name} from {ip}.',

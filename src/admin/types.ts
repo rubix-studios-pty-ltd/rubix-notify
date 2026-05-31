@@ -2,7 +2,7 @@ export type Priority = 'min' | 'low' | 'default' | 'high' | 'urgent'
 
 export type TemplateEvent = 'login_success' | 'login_failure'
 
-export interface NotificationTemplate {
+export interface Template {
   enabled: boolean
   topic: string
   title: string
@@ -16,7 +16,7 @@ export interface Settings {
   include_user_agent: boolean
   has_auth_token: boolean
   available_variables: string[]
-  templates: Record<TemplateEvent, NotificationTemplate>
+  templates: Record<TemplateEvent, Template>
 }
 
 export interface SaveSettings {
@@ -24,7 +24,7 @@ export interface SaveSettings {
   auth_token: string
   clear_auth_token: boolean
   include_user_agent: boolean
-  templates: Record<TemplateEvent, NotificationTemplate>
+  templates: Record<TemplateEvent, Template>
 }
 
 export interface TestResponse {

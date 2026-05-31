@@ -4,7 +4,11 @@
   "private": true,
   "scripts": {
     "start": "wp-scripts start",
-    "build": "wp-scripts build"
+    "build": "wp-scripts build",
+    "lint": "biome lint --write src",
+    "format": "biome format --write src",
+    "typecheck": "tsc --noEmit",
+    "update": "pnpm update --latest --recursive && pnpm install && pnpm prune && pnpm dedupe"
   },
   "dependencies": {
     "@wordpress/api-fetch": "^7.47.0",

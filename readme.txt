@@ -40,7 +40,7 @@ Rubix Notify is lightweight and focused. It does not replace a full security plu
 
 == Installation ==
 
-1. Upload the plugin files to the `/wp-content/plugins/wp-ntfy` directory, or install the plugin through the WordPress plugins screen.
+1. Upload the plugin files to the `/wp-content/plugins/rubix-notify` directory, or install the plugin through the WordPress plugins screen.
 2. Activate the plugin through the Plugins screen in WordPress.
 3. Go to the ntfy settings page in WordPress.
 4. Enter your ntfy server URL.

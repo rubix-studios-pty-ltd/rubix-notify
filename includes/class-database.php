@@ -471,13 +471,6 @@ final class Ntfy_Database
         return $decrypted !== '' ? $decrypted : $default;
     }
 
-    private static function sanitize_notify_level(string $value): string
-    {
-        $allowed = ['disabled', 'success', 'failure', 'all'];
-
-        return in_array($value, $allowed, true) ? $value : 'success';
-    }
-
     private static function sanitize_priority(string $value): string
     {
         $allowed = ['min', 'low', 'default', 'high', 'urgent'];
