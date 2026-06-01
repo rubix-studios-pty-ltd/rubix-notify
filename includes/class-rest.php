@@ -17,6 +17,11 @@ final class Ntfy_Rest
     {
         register_rest_route(self::NAMESPACE, '/settings', [
             [
+                'methods' => WP_REST_Server::READABLE,
+                'callback' => [self::class, 'get_settings'],
+                'permission_callback' => [self::class, 'can_manage'],
+            ],
+            [
                 'methods' => WP_REST_Server::CREATABLE,
                 'callback' => [self::class, 'save_settings'],
                 'permission_callback' => [self::class, 'can_manage'],
