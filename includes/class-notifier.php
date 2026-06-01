@@ -94,6 +94,7 @@ final class Ntfy_Notifier
         bool $blocking
     ): array {
         $server_url = rtrim((string) ($settings['server_url'] ?? ''), '/');
+        $site_url = home_url('/');
 
         if ($server_url === '') {
             return [
@@ -123,6 +124,7 @@ final class Ntfy_Notifier
         $headers = [
             'Title' => $title,
             'Priority' => self::clean_header((string) $template['priority'], 20),
+            'Click' => $site_url,
         ];
 
         if (!empty($template['tags'])) {
