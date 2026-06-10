@@ -5,7 +5,7 @@ Requires at least: 6.2
 Tested up to: 7.0
 Requires PHP: 7.4
 
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -13,21 +13,19 @@ Send WordPress login notifications to ntfy when users sign in.
 
 == Description ==
 
-Rubix Notify sends login notifications from your WordPress site to an ntfy topic. It is designed for site owners, administrators, agencies, and managed service providers who want simple push alerts when users access a WordPress dashboard.
+Rubix Notify sends login notifications from your WordPress site to an ntfy topic. Designed for site owners, administrators, agencies, and managed service providers who want simple push alerts when users access a WordPress dashboard.
 
-The plugin can be used with ntfy.sh or a self-hosted ntfy server. This makes it suitable for personal sites, client websites, internal systems, managed WordPress environments, and privacy-conscious deployments.
+The plugin can be used with ntfy.sh or a self-hosted ntfy server. Suitable for personal sites, client websites, internal systems and managed WordPress environments.
 
 When a user logs in, the plugin can send a notification to your configured ntfy topic. This helps administrators keep track of access activity without needing to constantly check WordPress logs or email inboxes.
 
-Typical use cases include:
+Use cases includes:
 
 * Monitoring administrator logins
 * Receiving alerts for client website access
 * Tracking access to internal WordPress sites
-* Sending login events to a self-hosted notification server
-* Improving visibility across managed WordPress installations
 
-Rubix Notify is lightweight and focused. It does not replace a full security plugin, firewall, or audit logging system. Instead, it provides a simple notification layer for login activity.
+Rubix Notify is lightweight and privacy-focused simple notification layer for login activity.
 
 == Features ==
 
@@ -71,9 +69,7 @@ No. This plugin sends notifications to ntfy. It does not send WordPress email al
 
 No. The plugin focuses on sending login notifications. It is not intended to be a full audit logging system.
 
-== Source Code and Build Instructions ==
-
-This plugin includes a compiled React admin asset at admin/index.js.
+== Source Code ==
 
 The human-readable source code used to generate the compiled admin asset is publicly available at:
 
@@ -81,17 +77,16 @@ https://github.com/rubix-studios-pty-ltd/rubix-notify
 
 To rebuild the compiled admin files:
 
-Clone the repository.
-Install dependencies with pnpm install.
-Build the admin assets with pnpm build.
+* Clone the repository.
+* Install dependencies with pnpm install.
+* Build the admin assets with pnpm build.
 
-The generated admin JavaScript is output to admin/index.js.
-
-Third-party JavaScript dependencies are declared in package.json and locked in pnpm-lock.yaml.
-
-The public repository is provided so future maintainers, reviewers, and contributors can inspect, modify, and rebuild the React admin interface from source.
+The public repository is provided so future maintainers, reviewers, and contributors can inspect, modify, and rebuild the react admin interface from source.
 
 == Changelog ==
+
+= 1.0.1 =
+* Updated plugin readme documentation.
 
 = 1.0.0 =
 * Initial release.
