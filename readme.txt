@@ -15,11 +15,11 @@ Send WordPress login notifications to ntfy when users sign in.
 
 Rubix Notify sends login notifications from your WordPress site to an ntfy topic. Designed for site owners, administrators, agencies, and managed service providers who want simple push alerts when users access a WordPress dashboard.
 
-The plugin can be used with ntfy.sh or a self-hosted ntfy server. Suitable for personal sites, client websites, internal systems and managed WordPress environments.
+The plugin can be used with **ntfy.sh** or a **self-hosted ntfy** server. Suitable for personal sites, client websites, internal systems and managed WordPress environments.
 
 When a user logs in, the plugin can send a notification to your configured ntfy topic. This helps administrators keep track of access activity without needing to constantly check WordPress logs or email inboxes.
 
-Use cases includes:
+Use cases:
 
 * Monitoring administrator logins
 * Receiving alerts for client website access
@@ -73,7 +73,7 @@ No. The plugin focuses on sending login notifications. It is not intended to be 
 
 The human-readable source code used to generate the compiled admin asset is publicly available at:
 
-https://github.com/rubix-studios-pty-ltd/rubix-notify
+[Rubix Notfy](https://github.com/rubix-studios-pty-ltd/rubix-notify)
 
 To rebuild the compiled admin files:
 
