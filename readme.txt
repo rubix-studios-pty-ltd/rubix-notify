@@ -1,11 +1,11 @@
 === Rubix Notify ===
 Contributors: rubixvi
-Tags: ntfy, notifications, login alerts, security, admin
+Tags: ntfy, notifications, notify, login alerts, security, admin
 Requires at least: 6.2
 Tested up to: 7.0
 Requires PHP: 7.4
 
-Stable tag: 1.0.1
+Stable tag: 1.0.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -69,11 +69,13 @@ No. This plugin sends notifications to ntfy. It does not send WordPress email al
 
 No. The plugin focuses on sending login notifications. It is not intended to be a full audit logging system.
 
-== Source Code ==
+== Maintainer ==
 
-The human-readable source code used to generate the compiled admin asset is publicly available at:
+Rubix Notify is developed and maintained by [Rubix Studios](https://rubixstudios.com.au), a Melbourne web engineering, hosting and digital operations studio.
 
-[Rubix Notfy](https://github.com/rubix-studios-pty-ltd/rubix-notify)
+Plugin source code is available on GitHub:
+
+[GitHub](https://github.com/rubix-studios-pty-ltd/rubix-notify)
 
 To rebuild the compiled admin files:
 
