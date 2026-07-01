@@ -12,7 +12,7 @@ import {
   ToggleControl,
 } from '@wordpress/components'
 
-import { getSettings, saveSettings, sendTest } from '../api'
+import { getCategories, getSettings, saveSettings, sendTest } from '../api'
 import {
   priorityOptions,
   templateDescriptions,
@@ -20,9 +20,21 @@ import {
   emptySettings,
   type NoticeState,
 } from '../constants'
-import { type Priority, type Settings, type TemplateEvent } from '../types'
-
-const templateEvents: TemplateEvent[] = ['login_success', 'login_failure']
+import {
+  type Category,
+  type Priority,
+  type Settings,
+  postEvent,
+  type TemplateEvent,
+  templateEvents,
+} from '../types'
+import { addPostCategory } from '../utils/add-category'
+import { getPosts } from '../utils/get-posts'
+import { removePost } from '../utils/remove-post'
+import { updatePost } from '../utils/update-post'
+import { updatePosts } from '../utils/update-posts'
+import { updateSetting } from '../utils/update-settings'
+import { updateTemplate } from '../utils/update-template'
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(emptySettings)
@@ -31,6 +43,7 @@ export function App() {
   const [notice, setNotice] = useState<NoticeState | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
 
   useEffect(() => {
     void loadSettings()
@@ -40,9 +53,10 @@ export function App() {
     setLoading(true)
 
     try {
-      const result = await getSettings()
+      const [result, categoryResult] = await Promise.all([getSettings(), getCategories()])
 
       setSettings(result)
+      setCategories(categoryResult)
     } catch (error) {
       setNotice({
         status: 'error',
@@ -54,27 +68,38 @@ export function App() {
   }
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
-    setSettings((current) => ({
-      ...current,
-      [key]: value,
-    }))
+    setSettings((current) => updateSetting(current, key, value))
   }
 
-  function updateTemplate<K extends keyof Settings['templates'][TemplateEvent]>(
+  function setPosts<K extends keyof ReturnType<typeof getPosts>>(
+    key: K,
+    value: ReturnType<typeof getPosts>[K]
+  ) {
+    setSettings((current) => updatePosts(current, key, value))
+  }
+
+  function addCategory() {
+    setSettings((current) => addPostCategory(current))
+  }
+
+  function setPost<K extends keyof ReturnType<typeof getPosts>>(
+    index: number,
+    key: K,
+    value: ReturnType<typeof getPosts>[K]
+  ) {
+    setSettings((current) => updatePost(current, index, key, value))
+  }
+
+  function deletePost(index: number) {
+    setSettings((current) => removePost(current, index))
+  }
+
+  function setTemplate<K extends keyof Settings['templates'][TemplateEvent]>(
     eventKey: TemplateEvent,
     key: K,
     value: Settings['templates'][TemplateEvent][K]
   ) {
-    setSettings((current) => ({
-      ...current,
-      templates: {
-        ...current.templates,
-        [eventKey]: {
-          ...current.templates[eventKey],
-          [key]: value,
-        },
-      },
-    }))
+    setSettings((current) => updateTemplate(current, eventKey, key, value))
   }
 
   async function handleSave(shouldSendTest: boolean) {
@@ -87,6 +112,7 @@ export function App() {
         auth_token: authToken,
         clear_auth_token: clearAuthToken,
         include_user_agent: settings.include_user_agent,
+        post: settings.post,
         templates: settings.templates,
       })
 
@@ -123,6 +149,16 @@ export function App() {
     return <p>Loading settings…</p>
   }
 
+  const defaultPost = getPosts(settings)
+
+  const categoryOptions = [
+    { label: 'Select category', value: '0' },
+    ...categories.map((category) => ({
+      label: `${category.name} (#${category.id})`,
+      value: String(category.id),
+    })),
+  ]
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 16 }}>
       {notice && (
@@ -136,6 +172,7 @@ export function App() {
         activeClass="is-active"
         tabs={[
           { name: 'settings', title: 'Settings' },
+          { name: 'posts', title: 'Posts' },
           { name: 'templates', title: 'Templates' },
         ]}
       >
@@ -186,10 +223,115 @@ export function App() {
                   />
                 </CardBody>
               </Card>
+            ) : tab.name === 'posts' ? (
+              <>
+                <Card>
+                  <CardHeader>
+                    <h2 style={{ margin: 0 }}>Posts</h2>
+                  </CardHeader>
+
+                  <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <ToggleControl
+                      label="Enable all post notifications"
+                      checked={defaultPost.enabled}
+                      help="Used when no category-specific setting matches."
+                      onChange={(value) => setPosts('enabled', Boolean(value))}
+                    />
+
+                    <TextControl
+                      label="Default topic"
+                      value={defaultPost.topic}
+                      placeholder="wordpress-{site_slug}"
+                      help="Default ntfy topic for published posts."
+                      onChange={(value) => setPosts('topic', value)}
+                    />
+
+                    <ToggleControl
+                      label="Include child categories"
+                      checked={defaultPost.include_children}
+                      onChange={(value) => setPosts('include_children', Boolean(value))}
+                    />
+                  </CardBody>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <div>
+                      <h2 style={{ margin: 0 }}>Category topics</h2>
+                      <p style={{ margin: '6px 0 0' }}>
+                        Override default post topic for selected categories.
+                      </p>
+                    </div>
+                  </CardHeader>
+
+                  <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {(settings.post ?? [])
+                      .map((post, index) => ({ post, index }))
+                      .filter(
+                        ({ post }) =>
+                          post.event_key === postEvent && post.rule_type === 'taxonomy_term'
+                      )
+                      .map(({ post, index }) => (
+                        <div
+                          key={`${post.id ?? 'new'}-${index}`}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 12,
+                            padding: 12,
+                            border: '1px solid #ddd',
+                          }}
+                        >
+                          <ToggleControl
+                            label="Enabled"
+                            checked={post.enabled}
+                            onChange={(value) => setPost(index, 'enabled', Boolean(value))}
+                          />
+
+                          <SelectControl
+                            label="Category"
+                            value={String(post.term_id)}
+                            options={categoryOptions}
+                            help="Select the WordPress category that should override the default topic."
+                            onChange={(value) =>
+                              setPost(index, 'term_id', Number.parseInt(value, 10) || 0)
+                            }
+                          />
+
+                          <TextControl
+                            label="Topic"
+                            value={post.topic}
+                            placeholder="wordpress-news"
+                            onChange={(value) => setPost(index, 'topic', value)}
+                          />
+
+                          <ToggleControl
+                            label="Include child categories"
+                            checked={post.include_children}
+                            onChange={(value) => setPost(index, 'include_children', Boolean(value))}
+                          />
+
+                          <Button
+                            variant="secondary"
+                            isDestructive
+                            onClick={() => deletePost(index)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+
+                    <Button variant="secondary" onClick={addCategory}>
+                      Add category
+                    </Button>
+                  </CardBody>
+                </Card>
+              </>
             ) : (
               <>
                 {templateEvents.map((eventKey) => {
                   const template = settings.templates[eventKey]
+                  const isPost = eventKey === 'post_published'
 
                   return (
                     <Card key={eventKey}>
@@ -202,38 +344,40 @@ export function App() {
                       </CardHeader>
 
                       <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                        <ToggleControl
-                          label="Enabled"
-                          checked={template.enabled}
-                          onChange={(value) => updateTemplate(eventKey, 'enabled', Boolean(value))}
-                        />
+                        {!isPost && (
+                          <>
+                            <ToggleControl
+                              label="Enabled"
+                              checked={template.enabled}
+                              onChange={(value) => setTemplate(eventKey, 'enabled', Boolean(value))}
+                            />
 
-                        <TextControl
-                          label="Topic"
-                          value={template.topic}
-                          onChange={(value) => updateTemplate(eventKey, 'topic', value)}
-                        />
+                            <TextControl
+                              label="Topic"
+                              value={template.topic}
+                              onChange={(value) => setTemplate(eventKey, 'topic', value)}
+                            />
+                          </>
+                        )}
 
                         <TextControl
                           label="Title"
                           value={template.title}
-                          onChange={(value) => updateTemplate(eventKey, 'title', value)}
+                          onChange={(value) => setTemplate(eventKey, 'title', value)}
                         />
 
                         <TextareaControl
                           label="Message"
                           rows={6}
                           value={template.message}
-                          onChange={(value) => updateTemplate(eventKey, 'message', value)}
+                          onChange={(value) => setTemplate(eventKey, 'message', value)}
                         />
 
                         <SelectControl
                           label="Priority"
                           value={template.priority}
                           options={priorityOptions}
-                          onChange={(value) =>
-                            updateTemplate(eventKey, 'priority', value as Priority)
-                          }
+                          onChange={(value) => setTemplate(eventKey, 'priority', value as Priority)}
                         />
 
                         <TextControl
@@ -241,7 +385,7 @@ export function App() {
                           value={template.tags}
                           placeholder="key,warning"
                           help="Comma-separated ntfy tags."
-                          onChange={(value) => updateTemplate(eventKey, 'tags', value)}
+                          onChange={(value) => setTemplate(eventKey, 'tags', value)}
                         />
                       </CardBody>
                     </Card>

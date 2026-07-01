@@ -6,6 +6,7 @@ if (!defined('ABSPATH')) {
 
 final class Ntfy_Notifier
 {
+    private const EVENT_POST_PUBLISHED = 'post_published';
     private const EVENT_LOGIN_SUCCESS = 'login_success';
     private const EVENT_LOGIN_FAILURE = 'login_failure';
 
@@ -13,6 +14,8 @@ final class Ntfy_Notifier
     {
         add_action('wp_login', [self::class, 'send_success'], 10, 2);
         add_action('wp_login_failed', [self::class, 'send_failure'], 10, 1);
+
+        add_action('transition_post_status', [self::class, 'send_post_published'], 10, 3);
     }
 
     public static function send_success(string $user_login, WP_User $user): void
@@ -72,6 +75,36 @@ final class Ntfy_Notifier
         return self::publish($settings, $template, $variables, true);
     }
 
+    public static function send_post_published(string $new_status, string $old_status, WP_Post $post): void
+    {
+        if ($new_status !== 'publish' || $old_status === 'publish') {
+            return;
+        }
+
+        if (wp_is_post_revision($post) || wp_is_post_autosave($post)) {
+            return;
+        }
+
+        $settings = Ntfy_Database::get_settings();
+        $template = self::template($settings, self::EVENT_POST_PUBLISHED);
+        $post_setting = self::post_setting($settings, $post);
+
+        if (!$post_setting || empty($post_setting['enabled'])) {
+            return;
+        }
+
+        $template['topic'] = (string) ($post_setting['topic'] ?? '');
+
+        $variables = self::post_variables(
+            event: self::EVENT_POST_PUBLISHED,
+            status: 'published',
+            post: $post,
+            settings: $settings
+        );
+
+        self::publish($settings, $template, $variables, false);
+    }
+
     private static function template(array $settings, string $event_key): array
     {
         $templates = is_array($settings['templates'] ?? null) ? $settings['templates'] : [];
@@ -124,7 +157,7 @@ final class Ntfy_Notifier
         $headers = [
             'Title' => $title,
             'Priority' => self::clean_header((string) $template['priority'], 20),
-            'Click' => $site_url,
+            'Click' => self::clean_header((string) ($variables['post_url'] ?? $site_url), 300),
         ];
 
         if (!empty($template['tags'])) {
@@ -239,5 +272,125 @@ final class Ntfy_Notifier
         $value = trim($value);
 
         return mb_substr($value, 0, 120);
+    }
+
+    private static function post_setting(array $settings, WP_Post $post): ?array
+    {
+        $rules = is_array($settings['post'] ?? null) ? $settings['post'] : [];
+
+        $fallback = null;
+
+        foreach ($rules as $rule) {
+            if (!is_array($rule)) {
+                continue;
+            }
+
+            if (($rule['event_key'] ?? '') !== self::EVENT_POST_PUBLISHED) {
+                continue;
+            }
+
+            if (($rule['post_type'] ?? 'post') !== $post->post_type) {
+                continue;
+            }
+
+            if (($rule['rule_type'] ?? '') === 'all') {
+                $fallback = $rule;
+                continue;
+            }
+
+            if (($rule['rule_type'] ?? '') !== 'taxonomy_term') {
+                continue;
+            }
+
+            $taxonomy = (string) ($rule['taxonomy'] ?? 'category');
+            $term_id = (int) ($rule['term_id'] ?? 0);
+
+            if ($term_id <= 0 || !taxonomy_exists($taxonomy)) {
+                continue;
+            }
+
+            if (self::post_matches_term($post, $taxonomy, $term_id, !empty($rule['include_children']))) {
+                return $rule;
+            }
+        }
+
+        return $fallback;
+    }
+
+    private static function post_matches_term(
+        WP_Post $post,
+        string $taxonomy,
+        int $rule_id,
+        bool $include_children
+    ): bool {
+        $terms = wp_get_post_terms($post->ID, $taxonomy, [
+            'fields' => 'ids',
+        ]);
+
+        if (is_wp_error($terms) || empty($terms)) {
+            return false;
+        }
+
+        $term_ids = array_map('intval', $terms);
+
+        if (in_array($rule_id, $term_ids, true)) {
+            return true;
+        }
+
+        if (!$include_children) {
+            return false;
+        }
+
+        foreach ($term_ids as $term_id) {
+            $ancestors = get_ancestors($term_id, $taxonomy, 'taxonomy');
+            $ancestors = array_map('intval', $ancestors);
+
+            if (in_array($rule_id, $ancestors, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function post_variables(
+        string $event,
+        string $status,
+        WP_Post $post,
+        array $settings
+    ): array {
+        $author = get_user_by('id', (int) $post->post_author);
+        $categories = get_the_category($post->ID);
+
+        $category_names = [];
+
+        if (is_array($categories)) {
+            foreach ($categories as $category) {
+                if ($category instanceof WP_Term) {
+                    $category_names[] = $category->name;
+                }
+            }
+        }
+
+        return array_merge(
+            self::variables(
+                event: $event,
+                status: $status,
+                username: $author instanceof WP_User ? $author->user_login : '',
+                user: $author instanceof WP_User ? $author : null,
+                settings: $settings
+            ),
+            [
+                'post_id' => (string) $post->ID,
+                'post_title' => get_the_title($post),
+                'post_type' => $post->post_type,
+                'post_status' => $post->post_status,
+                'post_url' => get_permalink($post),
+                'post_author' => $author instanceof WP_User ? $author->display_name : '',
+                'post_date' => get_post_time('Y-m-d H:i:s', false, $post),
+                'post_modified' => get_post_modified_time('Y-m-d H:i:s', false, $post),
+                'post_categories' => implode(', ', $category_names),
+            ]
+        );
     }
 }

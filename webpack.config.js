@@ -1,5 +1,5 @@
 const defaultConfig = require('@wordpress/scripts/config/webpack.config')
-const path = require('path')
+const path = require('node:path')
 
 module.exports = {
   ...defaultConfig,

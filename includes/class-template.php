@@ -32,6 +32,16 @@ final class Ntfy_Template
             '{ip}',
             '{user_agent}',
             '{time}',
+
+            '{post_id}',
+            '{post_title}',
+            '{post_type}',
+            '{post_status}',
+            '{post_url}',
+            '{post_author}',
+            '{post_date}',
+            '{post_modified}',
+            '{post_categories}',
         ];
     }
 }

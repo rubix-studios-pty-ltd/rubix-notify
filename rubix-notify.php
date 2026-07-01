@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Rubix Notify
  * Plugin URI: https://wordpress.org/plugins/rubix-notify
- * Description: Send WordPress login alerts to ntfy when users sign in, helping site owners and administrators monitor access activity.
- * Version: 1.0.1
+ * Description: Send WordPress login alerts and post announcements to dedicated ntfy topics using ntfy.sh or self-hosted ntfy.
+ * Version: 1.1.0
  * Author: Rubix Studios
  * Author URI: https://rubixstudios.com.au
  * License: GPLv2 or later
@@ -36,6 +36,8 @@ register_activation_hook(
 );
 
 add_action('plugins_loaded', static function (): void {
+    Ntfy_Database::maybe_upgrade();
+
     Ntfy_Notifier::init();
     Ntfy_Rest::init();
 

@@ -1,11 +1,11 @@
 === Rubix Notify ===
 Contributors: rubixvi
-Tags: ntfy, notifications, notify, login alerts, security, admin
+Tags: ntfy, notifications, notify, login alerts, security
 Requires at least: 6.2
 Tested up to: 7.0
 Requires PHP: 7.4
 
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -13,17 +13,20 @@ Send WordPress login notifications to ntfy when users sign in.
 
 == Description ==
 
-Rubix Notify sends login notifications from your WordPress site to an ntfy topic. Designed for site owners, administrators, agencies, and managed service providers who want simple push alerts when users access a WordPress dashboard.
+Rubix Notify sends notifications and announcements to dedicated ntfy topics.
 
-The plugin can be used with **ntfy.sh** or a **self-hosted ntfy** server. Suitable for personal sites, client websites, internal systems and managed WordPress environments.
+The plugin can be used with **ntfy.sh** or a **self-hosted ntfy** server. It is suitable for personal sites, client websites, internal systems, and managed WordPress environments.
 
-When a user logs in, the plugin can send a notification to your configured ntfy topic. This helps administrators keep track of access activity without needing to constantly check WordPress logs or email inboxes.
+When a user logs in, the plugin can send a notification to your configured ntfy topic. This helps administrators track access activity without needing to constantly check WordPress logs or email inboxes.
+
+Post announcements can also be sent to dedicated post topics, allowing subscribers to be alerted when new website posts are published.
 
 Use cases:
 
 * Monitoring administrator logins
 * Receiving alerts for client website access
 * Tracking access to internal WordPress sites
+* Sending post feeds and announcements to subscribers
 
 Rubix Notify is lightweight and privacy-focused simple notification layer for login activity.
 
@@ -87,8 +90,9 @@ The public repository is provided so future maintainers, reviewers, and contribu
 
 == Changelog ==
 
-= 1.0.1 =
+= 1.1.0 =
 * Updated plugin readme documentation.
+* Add new post table and template.
 
 = 1.0.0 =
 * Initial release.

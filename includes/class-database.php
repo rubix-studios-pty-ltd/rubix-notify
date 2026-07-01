@@ -6,18 +6,25 @@ if (!defined('ABSPATH')) {
 
 final class Ntfy_Database
 {
+    private const DB_VERSION = '1.1.0';
+    private const DB_VERSION_OPTION = 'rubix_notify_db_version';
+
     private const SETTING_KEY = 'default';
 
+    private const EVENT_POST_PUBLISHED = 'post_published';
     private const EVENT_LOGIN_SUCCESS = 'login_success';
     private const EVENT_LOGIN_FAILURE = 'login_failure';
 
     private const CACHE_GROUP = 'ntfy_alerts';
+
     private const CACHE_KEY_SETTINGS = 'settings_default';
+    private const CACHE_KEY_POST = 'post_default';
     private const CACHE_KEY_TEMPLATES = 'templates_default';
 
     private static function clear_cache(): void
     {
         wp_cache_delete(self::CACHE_KEY_SETTINGS, self::CACHE_GROUP);
+        wp_cache_delete(self::CACHE_KEY_POST, self::CACHE_GROUP);
         wp_cache_delete(self::CACHE_KEY_TEMPLATES, self::CACHE_GROUP);
     }
 
@@ -31,6 +38,13 @@ final class Ntfy_Database
         global $wpdb;
 
         return $wpdb->prefix . 'rubix_notify_settings';
+    }
+
+    public static function post_table(): string
+    {
+        global $wpdb;
+
+        return $wpdb->prefix . 'rubix_notify_post';
     }
 
     public static function templates_table(): string
@@ -62,6 +76,35 @@ final class Ntfy_Database
             UNIQUE KEY setting_key (setting_key)
         ) {$charset};";
 
+        $post_table = self::post_table();
+
+        $post_sql = "CREATE TABLE {$post_table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            setting_key VARCHAR(64) NOT NULL DEFAULT 'default',
+            event_key VARCHAR(64) NOT NULL DEFAULT 'post_published',
+            enabled TINYINT(1) NOT NULL DEFAULT 1,
+            rule_type VARCHAR(32) NOT NULL DEFAULT 'all',
+            post_type VARCHAR(32) NOT NULL DEFAULT 'post',
+            taxonomy VARCHAR(32) NOT NULL DEFAULT 'category',
+            term_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            topic_encrypted LONGTEXT NULL,
+            include_children TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            PRIMARY KEY (id),
+            UNIQUE KEY notification_rule (
+                setting_key,
+                event_key,
+                rule_type,
+                post_type,
+                taxonomy,
+                term_id
+            ),
+            KEY term_lookup (taxonomy, term_id),
+            KEY post_type_lookup (post_type),
+            KEY enabled_lookup (enabled)
+        ) {$charset};";
+
         $templates_table = self::templates_table();
 
         $templates_sql = "CREATE TABLE {$templates_table} (
@@ -81,9 +124,23 @@ final class Ntfy_Database
         ) {$charset};";
 
         dbDelta($settings_sql);
+        dbDelta($post_sql);
         dbDelta($templates_sql);
 
         self::insert_default_rows();
+
+        update_option(self::DB_VERSION_OPTION, self::DB_VERSION, false);
+    }
+
+    public static function maybe_upgrade(): void
+    {
+        $installed = (string) get_option(self::DB_VERSION_OPTION, '');
+
+        if ($installed === self::DB_VERSION) {
+            return;
+        }
+
+        self::activate();
     }
 
     public static function get_settings(): array
@@ -91,12 +148,14 @@ final class Ntfy_Database
         $defaults = self::defaults();
 
         $settings = self::get_settings_row();
+        $post = self::get_post_rows();
         $templates = self::get_template_rows();
 
-        if (!$settings && empty($templates)) {
+        if (!$settings && empty($post) && empty($templates)) {
             return $defaults;
         }
 
+        $post_template = $templates[self::EVENT_POST_PUBLISHED] ?? [];
         $success = $templates[self::EVENT_LOGIN_SUCCESS] ?? [];
         $failure = $templates[self::EVENT_LOGIN_FAILURE] ?? [];
 
@@ -107,7 +166,12 @@ final class Ntfy_Database
             ),
             'auth_token' => self::decrypt_value($settings['auth_token_encrypted'] ?? ''),
             'include_user_agent' => (bool) ($settings['include_user_agent'] ?? false),
+            'post' => self::format_post($post),
             'templates' => [
+                self::EVENT_POST_PUBLISHED => self::format_template(
+                    $post_template,
+                    $defaults['templates'][self::EVENT_POST_PUBLISHED]
+                ),
                 self::EVENT_LOGIN_SUCCESS => self::format_template(
                     $success,
                     $defaults['templates'][self::EVENT_LOGIN_SUCCESS]
@@ -175,7 +239,22 @@ final class Ntfy_Database
         }
 
         $templates = is_array($input['templates'] ?? null) ? $input['templates'] : [];
+        $post = is_array($input['post'] ?? null) ? $input['post'] : [];
         $defaults = self::defaults();
+
+        self::save_post($post);
+
+        self::save_template(
+            self::EVENT_POST_PUBLISHED,
+            is_array($templates[self::EVENT_POST_PUBLISHED] ?? null) ? $templates[self::EVENT_POST_PUBLISHED] : [],
+            $defaults['templates'][self::EVENT_POST_PUBLISHED]
+        );
+
+        self::save_template(
+            self::EVENT_POST_PUBLISHED,
+            is_array($templates[self::EVENT_POST_PUBLISHED] ?? null) ? $templates[self::EVENT_POST_PUBLISHED] : [],
+            $defaults['templates'][self::EVENT_POST_PUBLISHED]
+        );
 
         self::save_template(
             self::EVENT_LOGIN_SUCCESS,
@@ -211,6 +290,13 @@ final class Ntfy_Database
             ]);
         }
 
+        self::insert_default_post();
+
+        self::insert_default_template(
+            self::EVENT_POST_PUBLISHED,
+            $defaults['templates'][self::EVENT_POST_PUBLISHED]
+        );
+
         self::insert_default_template(
             self::EVENT_LOGIN_SUCCESS,
             $defaults['templates'][self::EVENT_LOGIN_SUCCESS]
@@ -222,6 +308,34 @@ final class Ntfy_Database
         );
 
         self::clear_cache();
+    }
+
+    private static function insert_default_post(): void
+    {
+        global $wpdb;
+
+        $existing = self::get_post_rows();
+
+        if (!empty($existing)) {
+            return;
+        }
+
+        $now = current_time('mysql');
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Custom plugin table.
+        $wpdb->insert(self::post_table(), [
+            'setting_key' => self::SETTING_KEY,
+            'event_key' => self::EVENT_POST_PUBLISHED,
+            'enabled' => 0,
+            'rule_type' => 'all',
+            'post_type' => 'post',
+            'taxonomy' => 'category',
+            'term_id' => 0,
+            'topic_encrypted' => '',
+            'include_children' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     private static function insert_default_template(string $event_key, array $template): void
@@ -249,6 +363,99 @@ final class Ntfy_Database
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+    }
+
+    private static function save_post(array $post): void
+    {
+        global $wpdb;
+
+        $now = current_time('mysql');
+        $rows = [];
+        $seen = [];
+
+        foreach ($post as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $event_key = sanitize_key((string) ($row['event_key'] ?? self::EVENT_POST_PUBLISHED));
+
+            if ($event_key !== self::EVENT_POST_PUBLISHED) {
+                continue;
+            }
+
+            $rule_type = sanitize_key((string) ($row['rule_type'] ?? 'all'));
+
+            if (!in_array($rule_type, ['all', 'taxonomy_term'], true)) {
+                $rule_type = 'all';
+            }
+
+            $post_type = sanitize_key((string) ($row['post_type'] ?? 'post'));
+            $taxonomy = sanitize_key((string) ($row['taxonomy'] ?? 'category'));
+            $term_id = max(0, absint($row['term_id'] ?? 0));
+
+            if ($rule_type === 'all') {
+                $taxonomy = 'category';
+                $term_id = 0;
+            }
+
+            $unique_key = implode('|', [
+                self::SETTING_KEY,
+                $event_key,
+                $rule_type,
+                $post_type,
+                $taxonomy,
+                (string) $term_id,
+            ]);
+
+            if (isset($seen[$unique_key])) {
+                continue;
+            }
+
+            $seen[$unique_key] = true;
+
+            $rows[] = [
+                'setting_key' => self::SETTING_KEY,
+                'event_key' => $event_key,
+                'enabled' => !empty($row['enabled']) ? 1 : 0,
+                'rule_type' => $rule_type,
+                'post_type' => $post_type !== '' ? $post_type : 'post',
+                'taxonomy' => $taxonomy !== '' ? $taxonomy : 'category',
+                'term_id' => $term_id,
+                'topic_encrypted' => Ntfy_Crypto::encrypt(
+                    self::sanitize_template_line((string) ($row['topic'] ?? ''))
+                ),
+                'include_children' => !empty($row['include_children']) ? 1 : 0,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        if (empty($seen[self::SETTING_KEY . '|' . self::EVENT_POST_PUBLISHED . '|all|post|category|0'])) {
+            $rows[] = [
+                'setting_key' => self::SETTING_KEY,
+                'event_key' => self::EVENT_POST_PUBLISHED,
+                'enabled' => 0,
+                'rule_type' => 'all',
+                'post_type' => 'post',
+                'taxonomy' => 'category',
+                'term_id' => 0,
+                'topic_encrypted' => '',
+                'include_children' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom plugin table; cache is cleared after save.
+        $wpdb->delete(self::post_table(), [
+            'setting_key' => self::SETTING_KEY,
+        ]);
+
+        foreach ($rows as $data) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Custom plugin table.
+            $wpdb->insert(self::post_table(), $data);
+        }
     }
 
     private static function save_template(
@@ -334,6 +541,62 @@ final class Ntfy_Database
         return $row;
     }
 
+    private static function get_post_rows(): array
+    {
+        global $wpdb;
+
+        $cached = wp_cache_get(self::CACHE_KEY_POST, self::CACHE_GROUP);
+
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Custom plugin table.
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                'SELECT * FROM %i WHERE setting_key = %s ORDER BY rule_type ASC, taxonomy ASC, term_id ASC',
+                self::post_table(),
+                self::SETTING_KEY
+            ),
+            ARRAY_A
+        );
+
+        $rows = is_array($rows) ? $rows : [];
+
+        wp_cache_set(
+            self::CACHE_KEY_POST,
+            $rows,
+            self::CACHE_GROUP
+        );
+
+        return $rows;
+    }
+
+    private static function format_post(array $rows): array
+    {
+        $posts = [];
+
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $posts[] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'event_key' => (string) ($row['event_key'] ?? 'post_published'),
+                'enabled' => !empty($row['enabled']),
+                'rule_type' => (string) ($row['rule_type'] ?? 'all'),
+                'post_type' => (string) ($row['post_type'] ?? 'post'),
+                'taxonomy' => (string) ($row['taxonomy'] ?? 'category'),
+                'term_id' => (int) ($row['term_id'] ?? 0),
+                'topic' => self::decrypt_value($row['topic_encrypted'] ?? ''),
+                'include_children' => !empty($row['include_children']),
+            ];
+        }
+
+        return $posts;
+    }
+
     private static function get_template_rows(): array
     {
         global $wpdb;
@@ -378,33 +641,6 @@ final class Ntfy_Database
         return isset($templates[$event_key]) && is_array($templates[$event_key])
             ? $templates[$event_key]
             : null;
-    }
-
-    private static function defaults(): array
-    {
-        return [
-            'server_url' => 'https://ntfy.sh',
-            'auth_token' => '',
-            'include_user_agent' => false,
-            'templates' => [
-                self::EVENT_LOGIN_SUCCESS => [
-                    'enabled' => true,
-                    'topic' => 'wordpress-{site_slug}',
-                    'title' => 'WordPress login {username}',
-                    'message' => "{username} logged into {site_name} from {ip} at {time}.\nRole {roles}\nURL {site_url}",
-                    'priority' => 'default',
-                    'tags' => 'key',
-                ],
-                self::EVENT_LOGIN_FAILURE => [
-                    'enabled' => false,
-                    'topic' => 'wordpress-{site_slug}',
-                    'title' => 'Failed WordPress login {username}',
-                    'message' => "Failed login attempt for {username} on {site_name}.\nIP {ip}\nTime {time}\nUser Agent {user_agent}",
-                    'priority' => 'high',
-                    'tags' => 'warning',
-                ],
-            ],
-        ];
     }
 
     private static function format_template(array $row, array $defaults): array
@@ -458,6 +694,54 @@ final class Ntfy_Database
         }
 
         return (string) $value;
+    }
+
+    private static function defaults(): array
+    {
+        return [
+            'server_url' => 'https://ntfy.sh',
+            'auth_token' => '',
+            'include_user_agent' => false,
+            'post' => [
+                [
+                    'id' => 0,
+                    'event_key' => self::EVENT_POST_PUBLISHED,
+                    'enabled' => false,
+                    'rule_type' => 'all',
+                    'post_type' => 'post',
+                    'taxonomy' => 'category',
+                    'term_id' => 0,
+                    'topic' => '',
+                    'include_children' => true,
+                ],
+            ],
+            'templates' => [
+                self::EVENT_POST_PUBLISHED => [
+                    'enabled' => false,
+                    'topic' => '',
+                    'title' => 'New post published: {post_title}',
+                    'message' => "{post_title} was published on {site_name}.\nAuthor {post_author}\nCategory {post_categories}\nURL {post_url}",
+                    'priority' => 'default',
+                    'tags' => 'newspaper',
+                ],
+                self::EVENT_LOGIN_SUCCESS => [
+                    'enabled' => true,
+                    'topic' => 'wordpress-{site_slug}',
+                    'title' => 'WordPress login {username}',
+                    'message' => "{username} logged into {site_name} from {ip} at {time}.\nRole {roles}\nURL {site_url}",
+                    'priority' => 'default',
+                    'tags' => 'key',
+                ],
+                self::EVENT_LOGIN_FAILURE => [
+                    'enabled' => false,
+                    'topic' => 'wordpress-{site_slug}',
+                    'title' => 'Failed WordPress login {username}',
+                    'message' => "Failed login attempt for {username} on {site_name}.\nIP {ip}\nTime {time}\nUser Agent {user_agent}",
+                    'priority' => 'high',
+                    'tags' => 'warning',
+                ],
+            ],
+        ];
     }
 
     private static function decrypt_value(?string $value, string $default = ''): string

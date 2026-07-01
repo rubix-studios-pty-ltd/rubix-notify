@@ -9,11 +9,13 @@ export const priorityOptions: Array<{ label: string; value: Priority }> = [
 ]
 
 export const templateLabels: Record<TemplateEvent, string> = {
+  post_published: 'Post published',
   login_success: 'Successful login',
   login_failure: 'Failed login',
 }
 
 export const templateDescriptions: Record<TemplateEvent, string> = {
+  post_published: 'Send a notification when a post is published.',
   login_success: 'Send a notification when a user logs in successfully.',
   login_failure: 'Send a notification when a login attempt fails.',
 }
@@ -28,7 +30,28 @@ export const emptySettings: Settings = {
   include_user_agent: false,
   has_auth_token: false,
   available_variables: [],
+  post: [
+    {
+      id: 0,
+      event_key: 'post_published',
+      enabled: false,
+      rule_type: 'all',
+      post_type: 'post',
+      taxonomy: 'category',
+      term_id: 0,
+      topic: '',
+      include_children: true,
+    },
+  ],
   templates: {
+    post_published: {
+      enabled: false,
+      topic: 'wordpress-{site_slug}',
+      title: 'New post published: {post_title}',
+      message: '{post_title} was published on {site_name}.\nAuthor {post_author}\nURL {post_url}',
+      priority: 'default',
+      tags: 'newspaper',
+    },
     login_success: {
       enabled: true,
       topic: 'wordpress-{site_slug}',
