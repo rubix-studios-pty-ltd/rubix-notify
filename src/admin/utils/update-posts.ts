@@ -1,5 +1,5 @@
 import { emptySettings } from '../constants'
-import { postEvent, type Post, type Settings } from '../types'
+import { type Post, postEvent, type Settings } from '../types'
 
 export function updatePosts<K extends keyof Post>(
   settings: Settings,

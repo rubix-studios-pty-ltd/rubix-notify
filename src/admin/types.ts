@@ -11,60 +11,60 @@ export const postEvent = 'post_published'
 export const templateEvents: TemplateEvent[] = ['login_success', 'login_failure', 'post_published']
 
 export interface NtfyConfig {
-  root: string
   namespace: string
   nonce: string
+  root: string
 }
 
 export interface Settings {
-  server_url: string
-  include_user_agent: boolean
-  has_auth_token: boolean
   available_variables: string[]
+  has_auth_token: boolean
+  include_user_agent: boolean
   post: Post[]
+  server_url: string
   templates: Record<TemplateEvent, Template>
 }
 
 export interface SaveSettings {
-  server_url: string
   auth_token: string
   clear_auth_token: boolean
   include_user_agent: boolean
   post: Post[]
+  server_url: string
   templates: Record<TemplateEvent, Template>
 }
 
 export interface Category {
   id: number
   name: string
-  slug: string
   parent: number
+  slug: string
 }
 
 export interface Post {
-  id?: number
-  event_key: PostEvent
   enabled: boolean
-  rule_type: PostType
+  event_key: PostEvent
+  id?: number
+  include_children: boolean
   post_type: string
+  rule_type: PostType
   taxonomy: string
   term_id: number
   topic: string
-  include_children: boolean
 }
 
 export interface Template {
   enabled: boolean
-  topic: string
-  title: string
   message: string
   priority: Priority
   tags: string
+  title: string
+  topic: string
 }
 
 export interface TestResponse {
-  success: boolean
   message: string
+  success: boolean
 }
 
 declare global {

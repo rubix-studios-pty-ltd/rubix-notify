@@ -1,30 +1,30 @@
-import { useEffect, useState } from '@wordpress/element'
 import {
   Button,
   Card,
   CardBody,
   CardHeader,
   Notice,
-  TabPanel,
   SelectControl,
+  TabPanel,
   TextareaControl,
   TextControl,
   ToggleControl,
 } from '@wordpress/components'
+import { useEffect, useState } from '@wordpress/element'
 
 import { getCategories, getSettings, saveSettings, sendTest } from '../api'
 import {
+  emptySettings,
+  type NoticeState,
   priorityOptions,
   templateDescriptions,
   templateLabels,
-  emptySettings,
-  type NoticeState,
 } from '../constants'
 import {
   type Category,
   type Priority,
-  type Settings,
   postEvent,
+  type Settings,
   type TemplateEvent,
   templateEvents,
 } from '../types'
@@ -162,14 +162,14 @@ export function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 16 }}>
       {notice && (
-        <Notice status={notice.status} isDismissible onRemove={() => setNotice(null)}>
+        <Notice isDismissible onRemove={() => setNotice(null)} status={notice.status}>
           {notice.message}
         </Notice>
       )}
 
       <TabPanel
-        className="wp-ntfy-tabs"
         activeClass="is-active"
+        className="wp-ntfy-tabs"
         tabs={[
           { name: 'settings', title: 'Settings' },
           { name: 'posts', title: 'Posts' },
@@ -187,38 +187,38 @@ export function App() {
                 <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <TextControl
                     label="Server URL"
-                    value={settings.server_url}
-                    placeholder="https://ntfy.sh"
                     onChange={(value) => update('server_url', value)}
+                    placeholder="https://ntfy.sh"
+                    value={settings.server_url}
                   />
 
                   <TextControl
-                    label="Access token"
-                    value={authToken}
-                    type="password"
-                    placeholder={
-                      settings.has_auth_token
-                        ? 'Leave blank to keep existing token.'
-                        : 'Optional bearer token'
-                    }
                     help={
                       settings.has_auth_token
                         ? 'There is currently an access token saved and encrypted.'
                         : 'Use this when your ntfy topic or server requires authentication.'
                     }
+                    label="Access token"
                     onChange={(value) => setAuthToken(value)}
+                    placeholder={
+                      settings.has_auth_token
+                        ? 'Leave blank to keep existing token.'
+                        : 'Optional bearer token'
+                    }
+                    type="password"
+                    value={authToken}
                   />
 
                   <ToggleControl
-                    label="Clear saved access token"
                     checked={clearAuthToken}
+                    label="Clear saved access token"
                     onChange={(value) => setClearAuthToken(Boolean(value))}
                   />
 
                   <ToggleControl
-                    label="Include user agent"
                     checked={settings.include_user_agent}
                     help="Disabled by default to reduce noisy output."
+                    label="Include user agent"
                     onChange={(value) => update('include_user_agent', Boolean(value))}
                   />
                 </CardBody>
@@ -232,23 +232,23 @@ export function App() {
 
                   <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <ToggleControl
-                      label="Enable all post notifications"
                       checked={defaultPost.enabled}
                       help="Used when no category-specific setting matches."
+                      label="Enable all post notifications"
                       onChange={(value) => setPosts('enabled', Boolean(value))}
                     />
 
                     <TextControl
-                      label="Default topic"
-                      value={defaultPost.topic}
-                      placeholder="wordpress-{site_slug}"
                       help="Default ntfy topic for published posts."
+                      label="Default topic"
                       onChange={(value) => setPosts('topic', value)}
+                      placeholder="wordpress-{site_slug}"
+                      value={defaultPost.topic}
                     />
 
                     <ToggleControl
-                      label="Include child categories"
                       checked={defaultPost.include_children}
+                      label="Include child categories"
                       onChange={(value) => setPosts('include_children', Boolean(value))}
                     />
                   </CardBody>
@@ -283,45 +283,45 @@ export function App() {
                           }}
                         >
                           <ToggleControl
-                            label="Enabled"
                             checked={post.enabled}
+                            label="Enabled"
                             onChange={(value) => setPost(index, 'enabled', Boolean(value))}
                           />
 
                           <SelectControl
-                            label="Category"
-                            value={String(post.term_id)}
-                            options={categoryOptions}
                             help="Select the WordPress category that should override the default topic."
+                            label="Category"
                             onChange={(value) =>
                               setPost(index, 'term_id', Number.parseInt(value, 10) || 0)
                             }
+                            options={categoryOptions}
+                            value={String(post.term_id)}
                           />
 
                           <TextControl
                             label="Topic"
-                            value={post.topic}
-                            placeholder="wordpress-news"
                             onChange={(value) => setPost(index, 'topic', value)}
+                            placeholder="wordpress-news"
+                            value={post.topic}
                           />
 
                           <ToggleControl
-                            label="Include child categories"
                             checked={post.include_children}
+                            label="Include child categories"
                             onChange={(value) => setPost(index, 'include_children', Boolean(value))}
                           />
 
                           <Button
-                            variant="secondary"
                             isDestructive
                             onClick={() => deletePost(index)}
+                            variant="secondary"
                           >
                             Remove
                           </Button>
                         </div>
                       ))}
 
-                    <Button variant="secondary" onClick={addCategory}>
+                    <Button onClick={addCategory} variant="secondary">
                       Add category
                     </Button>
                   </CardBody>
@@ -347,45 +347,45 @@ export function App() {
                         {!isPost && (
                           <>
                             <ToggleControl
-                              label="Enabled"
                               checked={template.enabled}
+                              label="Enabled"
                               onChange={(value) => setTemplate(eventKey, 'enabled', Boolean(value))}
                             />
 
                             <TextControl
                               label="Topic"
-                              value={template.topic}
                               onChange={(value) => setTemplate(eventKey, 'topic', value)}
+                              value={template.topic}
                             />
                           </>
                         )}
 
                         <TextControl
                           label="Title"
-                          value={template.title}
                           onChange={(value) => setTemplate(eventKey, 'title', value)}
+                          value={template.title}
                         />
 
                         <TextareaControl
                           label="Message"
+                          onChange={(value) => setTemplate(eventKey, 'message', value)}
                           rows={6}
                           value={template.message}
-                          onChange={(value) => setTemplate(eventKey, 'message', value)}
                         />
 
                         <SelectControl
                           label="Priority"
-                          value={template.priority}
-                          options={priorityOptions}
                           onChange={(value) => setTemplate(eventKey, 'priority', value as Priority)}
+                          options={priorityOptions}
+                          value={template.priority}
                         />
 
                         <TextControl
-                          label="Tags"
-                          value={template.tags}
-                          placeholder="key,warning"
                           help="Comma-separated ntfy tags."
+                          label="Tags"
                           onChange={(value) => setTemplate(eventKey, 'tags', value)}
+                          placeholder="key,warning"
+                          value={template.tags}
                         />
                       </CardBody>
                     </Card>
@@ -415,19 +415,19 @@ export function App() {
 
       <div style={{ display: 'flex', gap: 8 }}>
         <Button
-          variant="primary"
-          isBusy={saving}
           disabled={saving}
+          isBusy={saving}
           onClick={() => void handleSave(false)}
+          variant="primary"
         >
           Save
         </Button>
 
         <Button
-          variant="secondary"
-          isBusy={saving}
           disabled={saving}
+          isBusy={saving}
           onClick={() => void handleSave(true)}
+          variant="secondary"
         >
           Test and Save
         </Button>

@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.2/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.3/schema.json",
   "vcs": {
     "enabled": false,
     "clientKind": "git",
@@ -7,7 +7,18 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!node_modules", "!admin", "!build", "!dist", "!includes", "!out"]
+    "includes": [
+      "**",
+      "!node_modules",
+      "!admin",
+      "!build",
+      "!dist",
+      "!includes",
+      "!out",
+      "!**/*.svg",
+      "!**/*.png",
+      "!**/*.ico"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -43,10 +54,7 @@
       "trailingCommas": "es5",
       "semicolons": "asNeeded",
       "arrowParentheses": "always",
-      "bracketSameLine": false,
-      "quoteStyle": "single",
-      "attributePosition": "auto",
-      "bracketSpacing": true
+      "quoteStyle": "single"
     },
     "globals": ["exports"]
   },
@@ -60,7 +68,30 @@
     "enabled": true,
     "actions": {
       "source": {
-        "organizeImports": "on"
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [
+              ":NODE:",
+              ":BUN:",
+              ["node", "node:*"],
+              ["react", "react/**"],
+              ["next", "next/**", "next-*", "next-*/**"],
+              ":PACKAGE:",
+              ":BLANK_LINE:",
+              ["**", "!:STYLE:"],
+              ":BLANK_LINE:",
+              [":STYLE:"]
+            ]
+          }
+        },
+        "useSortedAttributes": {
+          "level": "on",
+          "options": {
+            "sortOrder": "natural"
+          }
+        },
+        "useSortedInterfaceMembers": "on"
       }
     }
   }
