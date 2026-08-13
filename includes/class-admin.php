@@ -61,6 +61,17 @@ final class Ntfy_Admin
         );
 
         wp_enqueue_style('wp-components');
+
+        $style_file = NTFY_PATH . 'admin/index.css';
+
+        if (file_exists($style_file)) {
+            wp_enqueue_style(
+                'rubix-notify-admin',
+                NTFY_URL . 'admin/index.css',
+                ['wp-components'],
+                (string) filemtime($style_file)
+            );
+        }
     }
 
     public static function render(): void
@@ -77,8 +88,20 @@ final class Ntfy_Admin
         $asset_file = NTFY_PATH . 'admin/index.asset.php';
         $script_file = NTFY_PATH . 'admin/index.js';
 
-        echo '<div class="wrap">';
-        echo '<h1>Notification</h1>';
+        echo '<div class="wrap rx-admin">';
+        echo '<h1 class="screen-reader-text">Rubix Notify</h1>';
+        echo '<header class="rx-hero">';
+        echo '<div class="rx-hero__mark" aria-hidden="true">';
+        echo '<span class="dashicons dashicons-bell"></span>';
+        echo '</div>';
+        echo '<div class="rx-hero__content">';
+        echo '<p class="rx-hero__eyebrow">Rubix Studios</p>';
+        echo '<h2>Rubix Notify</h2>';
+        echo '</div>';
+        echo '<span class="rx-hero__version">Version ';
+        echo esc_html(defined('NTFY_VERSION') ? NTFY_VERSION : '');
+        echo '</span>';
+        echo '</header>';
 
         if (!file_exists($asset_file) || !file_exists($script_file)) {
             echo '<div class="notice notice-warning"><p>';

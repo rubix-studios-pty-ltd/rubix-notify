@@ -6,7 +6,7 @@ if (!defined('ABSPATH')) {
 
 final class Ntfy_Database
 {
-    private const DB_VERSION = '1.1.0';
+    private const DB_VERSION = '1.2.0';
     private const DB_VERSION_OPTION = 'rubix_notify_db_version';
 
     private const SETTING_KEY = 'default';
@@ -54,9 +54,25 @@ final class Ntfy_Database
         return $wpdb->prefix . 'rubix_notify_templates';
     }
 
+    public static function login_attempts_table(): string
+    {
+        global $wpdb;
+
+        return $wpdb->prefix . 'rubix_notify_login_attempts';
+    }
+
+    public static function login_ips_table(): string
+    {
+        global $wpdb;
+
+        return $wpdb->prefix . 'rubix_notify_login_ips';
+    }
+
     public static function activate(): void
     {
         global $wpdb;
+
+        $installed_version = (string) get_option(self::DB_VERSION_OPTION, '');
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
@@ -123,11 +139,45 @@ final class Ntfy_Database
             UNIQUE KEY setting_event (setting_key, event_key)
         ) {$charset};";
 
+        $login_attempts_table = self::login_attempts_table();
+
+        $login_attempts_sql = "CREATE TABLE {$login_attempts_table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            ip_address VARCHAR(45) NOT NULL DEFAULT '',
+            username VARCHAR(191) NOT NULL DEFAULT '',
+            error_code VARCHAR(64) NOT NULL DEFAULT '',
+            attempted_at_gmt DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            KEY ip_attempted (ip_address, attempted_at_gmt),
+            KEY attempted_at_gmt (attempted_at_gmt)
+        ) {$charset};";
+
+        $login_ips_table = self::login_ips_table();
+
+        $login_ips_sql = "CREATE TABLE {$login_ips_table} (
+            ip_address VARCHAR(45) NOT NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'observed',
+            total_failures BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            first_failed_at_gmt DATETIME DEFAULT NULL,
+            last_failed_at_gmt DATETIME DEFAULT NULL,
+            last_notified_at_gmt DATETIME DEFAULT NULL,
+            rule_changed_at_gmt DATETIME DEFAULT NULL,
+            rule_changed_by BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            created_at_gmt DATETIME NOT NULL,
+            updated_at_gmt DATETIME NOT NULL,
+            PRIMARY KEY  (ip_address),
+            KEY status (status),
+            KEY last_failed_at_gmt (last_failed_at_gmt)
+        ) {$charset};";
+
         dbDelta($settings_sql);
         dbDelta($post_sql);
         dbDelta($templates_sql);
+        dbDelta($login_attempts_sql);
+        dbDelta($login_ips_sql);
 
         self::insert_default_rows();
+        self::upgrade_failure_template($installed_version);
 
         update_option(self::DB_VERSION_OPTION, self::DB_VERSION, false);
     }
@@ -141,6 +191,322 @@ final class Ntfy_Database
         }
 
         self::activate();
+    }
+
+    public static function record_login_failure(
+        string $ip_address,
+        string $username,
+        string $error_code
+    ): array {
+        global $wpdb;
+
+        $now = gmdate('Y-m-d H:i:s');
+        $username = sanitize_text_field(wp_unslash($username));
+        $username = function_exists('mb_substr')
+            ? mb_substr($username, 0, 191)
+            : substr($username, 0, 191);
+        $error_code = substr(sanitize_key($error_code), 0, 64);
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Security audit data is stored in a custom table.
+        $wpdb->insert(
+            self::login_attempts_table(),
+            [
+                'ip_address' => $ip_address,
+                'username' => $username,
+                'error_code' => $error_code,
+                'attempted_at_gmt' => $now,
+            ],
+            ['%s', '%s', '%s', '%s']
+        );
+
+        if ($ip_address === '') {
+            return [
+                'failures_last_hour' => 0,
+                'status' => 'observed',
+            ];
+        }
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Atomic aggregate update in a custom table.
+        $wpdb->query(
+            $wpdb->prepare(
+                'INSERT INTO %i
+                    (ip_address, status, total_failures, first_failed_at_gmt, last_failed_at_gmt, created_at_gmt, updated_at_gmt)
+                VALUES (%s, %s, 1, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    total_failures = total_failures + 1,
+                    first_failed_at_gmt = COALESCE(first_failed_at_gmt, VALUES(first_failed_at_gmt)),
+                    last_failed_at_gmt = VALUES(last_failed_at_gmt),
+                    updated_at_gmt = VALUES(updated_at_gmt)',
+                self::login_ips_table(),
+                $ip_address,
+                'observed',
+                $now,
+                $now,
+                $now,
+                $now
+            )
+        );
+
+        $cutoff = gmdate('Y-m-d H:i:s', time() - HOUR_IN_SECONDS);
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Rolling security count in a custom table.
+        $failures_last_hour = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT COUNT(*) FROM %i WHERE ip_address = %s AND attempted_at_gmt >= %s',
+                self::login_attempts_table(),
+                $ip_address,
+                $cutoff
+            )
+        );
+
+        return [
+            'failures_last_hour' => $failures_last_hour,
+            'status' => self::get_login_ip_status($ip_address),
+        ];
+    }
+
+    public static function get_login_ip_status(string $ip_address): string
+    {
+        global $wpdb;
+
+        if ($ip_address === '') {
+            return 'observed';
+        }
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Security rule lookup in a custom table.
+        $status = $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT status FROM %i WHERE ip_address = %s',
+                self::login_ips_table(),
+                $ip_address
+            )
+        );
+
+        return in_array($status, ['banned', 'whitelisted'], true)
+            ? (string) $status
+            : 'observed';
+    }
+
+    public static function set_login_ip_status(
+        string $ip_address,
+        string $status,
+        int $user_id
+    ): bool {
+        global $wpdb;
+
+        if (!in_array($status, ['observed', 'banned', 'whitelisted'], true)) {
+            return false;
+        }
+
+        $now = gmdate('Y-m-d H:i:s');
+
+        if ($status === 'observed') {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Security rule update in a custom table.
+            $result = $wpdb->update(
+                self::login_ips_table(),
+                [
+                    'status' => 'observed',
+                    'rule_changed_at_gmt' => $now,
+                    'rule_changed_by' => $user_id,
+                    'updated_at_gmt' => $now,
+                ],
+                ['ip_address' => $ip_address],
+                ['%s', '%s', '%d', '%s'],
+                ['%s']
+            );
+
+            return $result !== false;
+        }
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Atomic security rule insert or update in a custom table.
+        $result = $wpdb->query(
+            $wpdb->prepare(
+                'INSERT INTO %i
+                    (ip_address, status, total_failures, rule_changed_at_gmt, rule_changed_by, created_at_gmt, updated_at_gmt)
+                VALUES (%s, %s, 0, %s, %d, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    status = VALUES(status),
+                    rule_changed_at_gmt = VALUES(rule_changed_at_gmt),
+                    rule_changed_by = VALUES(rule_changed_by),
+                    updated_at_gmt = VALUES(updated_at_gmt)',
+                self::login_ips_table(),
+                $ip_address,
+                $status,
+                $now,
+                $user_id,
+                $now,
+                $now
+            )
+        );
+
+        return $result !== false;
+    }
+
+    public static function claim_login_alert(
+        string $ip_address,
+        int $cooldown_seconds
+    ): ?string {
+        global $wpdb;
+
+        $now = gmdate('Y-m-d H:i:s');
+        $cutoff = gmdate('Y-m-d H:i:s', time() - max(1, $cooldown_seconds));
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Atomic notification throttle in a custom table.
+        $updated = $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE %i
+                SET last_notified_at_gmt = %s, updated_at_gmt = %s
+                WHERE ip_address = %s
+                    AND status <> 'whitelisted'
+                    AND (last_notified_at_gmt IS NULL OR last_notified_at_gmt < %s)",
+                self::login_ips_table(),
+                $now,
+                $now,
+                $ip_address,
+                $cutoff
+            )
+        );
+
+        return $updated === 1 ? $now : null;
+    }
+
+    public static function release_login_alert(string $ip_address, string $claimed_at_gmt): void
+    {
+        global $wpdb;
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Releases a failed notification claim for retry.
+        $wpdb->query(
+            $wpdb->prepare(
+                'UPDATE %i SET last_notified_at_gmt = NULL WHERE ip_address = %s AND last_notified_at_gmt = %s',
+                self::login_ips_table(),
+                $ip_address,
+                $claimed_at_gmt
+            )
+        );
+    }
+
+    public static function get_login_security_snapshot(int $limit = 100): array
+    {
+        global $wpdb;
+
+        $limit = max(1, min(200, $limit));
+        $cutoff = gmdate('Y-m-d H:i:s', time() - HOUR_IN_SECONDS);
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Admin security report from custom tables.
+        $ips = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT i.ip_address, i.status, i.total_failures, i.first_failed_at_gmt,
+                    i.last_failed_at_gmt, i.last_notified_at_gmt,
+                    COALESCE(recent.failures_last_hour, 0) AS failures_last_hour
+                FROM %i i
+                LEFT JOIN (
+                    SELECT ip_address, COUNT(*) AS failures_last_hour
+                    FROM %i
+                    WHERE attempted_at_gmt >= %s
+                    GROUP BY ip_address
+                ) recent ON recent.ip_address = i.ip_address
+                ORDER BY
+                    CASE
+                        WHEN i.status = 'banned' THEN 0
+                        WHEN i.status = 'whitelisted' THEN 1
+                        ELSE 2
+                    END,
+                    COALESCE(i.last_failed_at_gmt, i.updated_at_gmt) DESC
+                LIMIT %d",
+                self::login_ips_table(),
+                self::login_attempts_table(),
+                $cutoff,
+                $limit
+            ),
+            ARRAY_A
+        );
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Recent audit report from a custom table.
+        $attempts = $wpdb->get_results(
+            $wpdb->prepare(
+                'SELECT id, ip_address, username, error_code, attempted_at_gmt
+                FROM %i
+                ORDER BY attempted_at_gmt DESC, id DESC
+                LIMIT %d',
+                self::login_attempts_table(),
+                50
+            ),
+            ARRAY_A
+        );
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Admin summary from custom security tables.
+        $attempts_last_hour = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                'SELECT COUNT(*) FROM %i WHERE attempted_at_gmt >= %s',
+                self::login_attempts_table(),
+                $cutoff
+            )
+        );
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Admin summary from a custom security table.
+        $status_rows = $wpdb->get_results(
+            $wpdb->prepare(
+                'SELECT status, COUNT(*) AS total FROM %i GROUP BY status',
+                self::login_ips_table()
+            ),
+            ARRAY_A
+        );
+
+        $summary = [
+            'attempts_last_hour' => $attempts_last_hour,
+            'tracked_ips' => 0,
+            'banned_ips' => 0,
+            'whitelisted_ips' => 0,
+        ];
+
+        foreach ((array) $status_rows as $row) {
+            $count = (int) ($row['total'] ?? 0);
+            $summary['tracked_ips'] += $count;
+
+            if (($row['status'] ?? '') === 'banned') {
+                $summary['banned_ips'] = $count;
+            } elseif (($row['status'] ?? '') === 'whitelisted') {
+                $summary['whitelisted_ips'] = $count;
+            }
+        }
+
+        foreach ((array) $ips as &$ip) {
+            $ip['total_failures'] = (int) ($ip['total_failures'] ?? 0);
+            $ip['failures_last_hour'] = (int) ($ip['failures_last_hour'] ?? 0);
+        }
+        unset($ip);
+
+        foreach ((array) $attempts as &$attempt) {
+            $attempt['id'] = (int) ($attempt['id'] ?? 0);
+        }
+        unset($attempt);
+
+        return [
+            'summary' => $summary,
+            'ips' => is_array($ips) ? $ips : [],
+            'attempts' => is_array($attempts) ? $attempts : [],
+        ];
+    }
+
+    public static function delete_old_login_attempts(int $retention_days = 90): int
+    {
+        global $wpdb;
+
+        $cutoff = gmdate(
+            'Y-m-d H:i:s',
+            time() - (max(1, $retention_days) * DAY_IN_SECONDS)
+        );
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Scheduled retention cleanup for custom audit data.
+        $deleted = $wpdb->query(
+            $wpdb->prepare(
+                'DELETE FROM %i WHERE attempted_at_gmt < %s',
+                self::login_attempts_table(),
+                $cutoff
+            )
+        );
+
+        return is_int($deleted) ? $deleted : 0;
     }
 
     public static function get_settings(): array
@@ -243,12 +609,6 @@ final class Ntfy_Database
         $defaults = self::defaults();
 
         self::save_post($post);
-
-        self::save_template(
-            self::EVENT_POST_PUBLISHED,
-            is_array($templates[self::EVENT_POST_PUBLISHED] ?? null) ? $templates[self::EVENT_POST_PUBLISHED] : [],
-            $defaults['templates'][self::EVENT_POST_PUBLISHED]
-        );
 
         self::save_template(
             self::EVENT_POST_PUBLISHED,
@@ -363,6 +723,52 @@ final class Ntfy_Database
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+    }
+
+    private static function upgrade_failure_template(string $installed_version): void
+    {
+        global $wpdb;
+
+        if (
+            $installed_version === ''
+            || version_compare($installed_version, '1.2.0', '>=')
+        ) {
+            return;
+        }
+
+        $row = self::get_template_row(self::EVENT_LOGIN_FAILURE);
+
+        if (!$row) {
+            return;
+        }
+
+        $old_title = 'Failed WordPress login {username}';
+        $old_message = "Failed login attempt for {username} on {site_name}.\nIP {ip}\nTime {time}\nUser Agent {user_agent}";
+
+        if (
+            self::decrypt_value($row['title_encrypted'] ?? '') !== $old_title
+            || self::decrypt_value($row['message_encrypted'] ?? '') !== $old_message
+        ) {
+            return;
+        }
+
+        $template = self::defaults()['templates'][self::EVENT_LOGIN_FAILURE];
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- One-time migration of an unchanged default template.
+        $wpdb->update(
+            self::templates_table(),
+            [
+                'title_encrypted' => Ntfy_Crypto::encrypt((string) $template['title']),
+                'message_encrypted' => Ntfy_Crypto::encrypt((string) $template['message']),
+                'updated_at' => current_time('mysql'),
+            ],
+            [
+                'setting_key' => self::SETTING_KEY,
+                'event_key' => self::EVENT_LOGIN_FAILURE,
+            ]
+        );
+
+        self::clear_cache();
     }
 
     private static function save_post(array $post): void
@@ -735,8 +1141,8 @@ final class Ntfy_Database
                 self::EVENT_LOGIN_FAILURE => [
                     'enabled' => false,
                     'topic' => 'wordpress-{site_slug}',
-                    'title' => 'Failed WordPress login {username}',
-                    'message' => "Failed login attempt for {username} on {site_name}.\nIP {ip}\nTime {time}\nUser Agent {user_agent}",
+                    'title' => 'Repeated WordPress login failures from {ip}',
+                    'message' => "{failure_count} failed logins were recorded from {ip} within {window_minutes} minutes on {site_name}.\nLatest username {username}\nTime {time}\nUser Agent {user_agent}",
                     'priority' => 'high',
                     'tags' => 'warning',
                 ],

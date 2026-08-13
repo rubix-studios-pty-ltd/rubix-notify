@@ -67,6 +67,46 @@ export interface TestResponse {
   success: boolean
 }
 
+export type IpRuleAction = 'ban' | 'unban' | 'whitelist' | 'remove_whitelist'
+
+export type IpStatus = 'observed' | 'banned' | 'whitelisted'
+
+export interface SecuritySummary {
+  attempts_last_hour: number
+  banned_ips: number
+  tracked_ips: number
+  whitelisted_ips: number
+}
+
+export interface SecurityIp {
+  failures_last_hour: number
+  first_failed_at_gmt: string | null
+  ip_address: string
+  last_failed_at_gmt: string | null
+  last_notified_at_gmt: string | null
+  status: IpStatus
+  total_failures: number
+}
+
+export interface LoginAttempt {
+  attempted_at_gmt: string
+  error_code: string
+  id: number
+  ip_address: string
+  username: string
+}
+
+export interface SecurityData {
+  alert_threshold: number
+  alerts_enabled: boolean
+  attempts: LoginAttempt[]
+  current_ip: string
+  ips: SecurityIp[]
+  retention_days: number
+  summary: SecuritySummary
+  window_minutes: number
+}
+
 declare global {
   interface Window {
     NTFY_ALERTS: NtfyConfig

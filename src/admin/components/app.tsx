@@ -12,8 +12,16 @@ import {
 } from '@wordpress/components'
 import { useEffect, useState } from '@wordpress/element'
 
-import { getCategories, getSettings, saveSettings, sendTest } from '../api'
 import {
+  getCategories,
+  getSecurity,
+  getSettings,
+  saveSettings,
+  sendTest,
+  updateIpRule,
+} from '../api'
+import {
+  emptySecurity,
   emptySettings,
   type NoticeState,
   priorityOptions,
@@ -22,6 +30,7 @@ import {
 } from '../constants'
 import {
   type Category,
+  type IpRuleAction,
   type Priority,
   postEvent,
   type Settings,
@@ -35,6 +44,7 @@ import { updatePost } from '../utils/update-post'
 import { updatePosts } from '../utils/update-posts'
 import { updateSetting } from '../utils/update-settings'
 import { updateTemplate } from '../utils/update-template'
+import { SecurityPanel } from './security'
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(emptySettings)
@@ -44,6 +54,9 @@ export function App() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
+  const [security, setSecurity] = useState(emptySecurity)
+  const [securityLoading, setSecurityLoading] = useState(true)
+  const [securityAction, setSecurityAction] = useState('')
 
   useEffect(() => {
     void loadSettings()
@@ -53,10 +66,15 @@ export function App() {
     setLoading(true)
 
     try {
-      const [result, categoryResult] = await Promise.all([getSettings(), getCategories()])
+      const [result, categoryResult, securityResult] = await Promise.all([
+        getSettings(),
+        getCategories(),
+        getSecurity(),
+      ])
 
       setSettings(result)
       setCategories(categoryResult)
+      setSecurity(securityResult)
     } catch (error) {
       setNotice({
         status: 'error',
@@ -64,6 +82,7 @@ export function App() {
       })
     } finally {
       setLoading(false)
+      setSecurityLoading(false)
     }
   }
 
@@ -102,6 +121,47 @@ export function App() {
     setSettings((current) => updateTemplate(current, eventKey, key, value))
   }
 
+  async function refreshSecurity() {
+    setSecurityLoading(true)
+
+    try {
+      setSecurity(await getSecurity())
+    } catch (error) {
+      setNotice({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unable to refresh login security.',
+      })
+    } finally {
+      setSecurityLoading(false)
+    }
+  }
+
+  async function handleIpRule(ip: string, action: IpRuleAction): Promise<boolean> {
+    const actionKey = `${action}:${ip}`
+
+    setSecurityAction(actionKey)
+    setNotice(null)
+
+    try {
+      setSecurity(await updateIpRule(ip, action))
+      setNotice({
+        status: 'success',
+        message: 'IP rule updated.',
+      })
+
+      return true
+    } catch (error) {
+      setNotice({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Unable to update the IP rule.',
+      })
+
+      return false
+    } finally {
+      setSecurityAction('')
+    }
+  }
+
   async function handleSave(shouldSendTest: boolean) {
     setSaving(true)
     setNotice(null)
@@ -117,6 +177,10 @@ export function App() {
       })
 
       setSettings(saved)
+      setSecurity((current) => ({
+        ...current,
+        alerts_enabled: saved.templates.login_failure.enabled,
+      }))
       setAuthToken('')
       setClearAuthToken(false)
 
@@ -172,6 +236,7 @@ export function App() {
         className="wp-ntfy-tabs"
         tabs={[
           { name: 'settings', title: 'Settings' },
+          { name: 'security', title: 'Security' },
           { name: 'posts', title: 'Posts' },
           { name: 'templates', title: 'Templates' },
         ]}
@@ -223,6 +288,14 @@ export function App() {
                   />
                 </CardBody>
               </Card>
+            ) : tab.name === 'security' ? (
+              <SecurityPanel
+                busyAction={securityAction}
+                data={security}
+                loading={securityLoading}
+                onRefresh={refreshSecurity}
+                onRule={handleIpRule}
+              />
             ) : tab.name === 'posts' ? (
               <>
                 <Card>

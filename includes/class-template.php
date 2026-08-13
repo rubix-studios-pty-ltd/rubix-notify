@@ -32,7 +32,8 @@ final class Ntfy_Template
             '{ip}',
             '{user_agent}',
             '{time}',
-
+            '{failure_count}',
+            '{window_minutes}',
             '{post_id}',
             '{post_title}',
             '{post_type}',

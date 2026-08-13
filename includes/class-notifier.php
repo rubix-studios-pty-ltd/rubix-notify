@@ -13,7 +13,6 @@ final class Ntfy_Notifier
     public static function init(): void
     {
         add_action('wp_login', [self::class, 'send_success'], 10, 2);
-        add_action('wp_login_failed', [self::class, 'send_failure'], 10, 1);
 
         add_action('transition_post_status', [self::class, 'send_post_published'], 10, 3);
     }
@@ -28,34 +27,53 @@ final class Ntfy_Notifier
         }
 
         $variables = self::variables(
-            event: self::EVENT_LOGIN_SUCCESS,
-            status: 'success',
-            username: $user_login,
-            user: $user,
-            settings: $settings
+            self::EVENT_LOGIN_SUCCESS,
+            'success',
+            $user_login,
+            $user,
+            $settings
         );
 
         self::publish($settings, $template, $variables, false);
     }
 
-    public static function send_failure(string $username): void
-    {
+    public static function send_failure(
+        string $username,
+        string $ip_address = '',
+        int $failure_count = 1
+    ): array {
         $settings = Ntfy_Database::get_settings();
         $template = self::template($settings, self::EVENT_LOGIN_FAILURE);
 
         if (empty($template['enabled'])) {
-            return;
+            return [
+                'success' => false,
+                'message' => 'Failed-login alerts are disabled.',
+            ];
         }
 
         $variables = self::variables(
-            event: self::EVENT_LOGIN_FAILURE,
-            status: 'failure',
-            username: $username,
-            user: null,
-            settings: $settings
+            self::EVENT_LOGIN_FAILURE,
+            'failure',
+            $username,
+            null,
+            $settings,
+            $ip_address,
+            [
+                'failure_count' => (string) $failure_count,
+                'window_minutes' => (string) (Ntfy_Login_Security::WINDOW_SECONDS / MINUTE_IN_SECONDS),
+            ]
         );
 
-        self::publish($settings, $template, $variables, false);
+        return self::publish($settings, $template, $variables, false);
+    }
+
+    public static function failure_alert_enabled(): bool
+    {
+        $settings = Ntfy_Database::get_settings();
+        $template = self::template($settings, self::EVENT_LOGIN_FAILURE);
+
+        return !empty($template['enabled']);
     }
 
     public static function send_test(): array
@@ -65,11 +83,11 @@ final class Ntfy_Notifier
         $user = wp_get_current_user();
 
         $variables = self::variables(
-            event: 'test_notification',
-            status: 'test',
-            username: $user instanceof WP_User && $user->exists() ? $user->user_login : 'test',
-            user: $user instanceof WP_User && $user->exists() ? $user : null,
-            settings: $settings
+            'test_notification',
+            'test',
+            $user instanceof WP_User && $user->exists() ? $user->user_login : 'test',
+            $user instanceof WP_User && $user->exists() ? $user : null,
+            $settings
         );
 
         return self::publish($settings, $template, $variables, true);
@@ -96,10 +114,10 @@ final class Ntfy_Notifier
         $template['topic'] = (string) ($post_setting['topic'] ?? '');
 
         $variables = self::post_variables(
-            event: self::EVENT_POST_PUBLISHED,
-            status: 'published',
-            post: $post,
-            settings: $settings
+            self::EVENT_POST_PUBLISHED,
+            'published',
+            $post,
+            $settings
         );
 
         self::publish($settings, $template, $variables, false);
@@ -176,17 +194,17 @@ final class Ntfy_Notifier
             'body' => $message,
         ]);
 
-        if (!$blocking) {
-            return [
-                'success' => true,
-                'message' => 'Queued.',
-            ];
-        }
-
         if (is_wp_error($response)) {
             return [
                 'success' => false,
                 'message' => $response->get_error_message(),
+            ];
+        }
+
+        if (!$blocking) {
+            return [
+                'success' => true,
+                'message' => 'Queued.',
             ];
         }
 
@@ -210,12 +228,14 @@ final class Ntfy_Notifier
         string $status,
         string $username,
         ?WP_User $user,
-        array $settings
+        array $settings,
+        string $ip_address = '',
+        array $extra = []
     ): array {
         $site_url = home_url('/');
         $host = wp_parse_url($site_url, PHP_URL_HOST);
 
-        return [
+        $variables = [
             'site_name' => get_bloginfo('name'),
             'site_url' => $site_url,
             'site_slug' => sanitize_title($host ?: get_bloginfo('name')),
@@ -225,37 +245,18 @@ final class Ntfy_Notifier
             'display_name' => $user ? $user->display_name : '',
             'user_email' => $user ? $user->user_email : '',
             'roles' => $user ? implode(', ', $user->roles) : '',
-            'ip' => self::ip(),
+            'ip' => $ip_address !== ''
+                ? $ip_address
+                : Ntfy_Login_Security::client_ip(),
             'user_agent' => !empty($settings['include_user_agent'])
                 ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'] ?? ''))
                 : '',
             'time' => current_time('mysql'),
-        ];
-    }
-
-    private static function ip(): string
-    {
-        $headers = [
-            'HTTP_CF_CONNECTING_IP',
-            'HTTP_X_FORWARDED_FOR',
-            'HTTP_X_REAL_IP',
-            'REMOTE_ADDR',
+            'failure_count' => '',
+            'window_minutes' => '',
         ];
 
-        foreach ($headers as $header) {
-            if (empty($_SERVER[$header])) {
-                continue;
-            }
-
-            $value = sanitize_text_field(wp_unslash($_SERVER[$header]));
-            $ip = trim(explode(',', $value)[0]);
-
-            if (filter_var($ip, FILTER_VALIDATE_IP)) {
-                return $ip;
-            }
-        }
-
-        return '';
+        return array_merge($variables, $extra);
     }
 
     private static function clean_header(string $value, int $max_length = 200): string
@@ -263,7 +264,9 @@ final class Ntfy_Notifier
         $value = str_replace(["\r", "\n"], ' ', $value);
         $value = trim($value);
 
-        return mb_substr($value, 0, $max_length);
+        return function_exists('mb_substr')
+            ? mb_substr($value, 0, $max_length)
+            : substr($value, 0, $max_length);
     }
 
     private static function clean_topic(string $value): string
@@ -271,7 +274,9 @@ final class Ntfy_Notifier
         $value = str_replace(["\r", "\n", '/', '\\'], '-', $value);
         $value = trim($value);
 
-        return mb_substr($value, 0, 120);
+        return function_exists('mb_substr')
+            ? mb_substr($value, 0, 120)
+            : substr($value, 0, 120);
     }
 
     private static function post_setting(array $settings, WP_Post $post): ?array
@@ -374,11 +379,11 @@ final class Ntfy_Notifier
 
         return array_merge(
             self::variables(
-                event: $event,
-                status: $status,
-                username: $author instanceof WP_User ? $author->user_login : '',
-                user: $author instanceof WP_User ? $author : null,
-                settings: $settings
+                $event,
+                $status,
+                $author instanceof WP_User ? $author->user_login : '',
+                $author instanceof WP_User ? $author : null,
+                $settings
             ),
             [
                 'post_id' => (string) $post->ID,

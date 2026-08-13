@@ -1,4 +1,4 @@
-import { type Priority, type Settings, type TemplateEvent } from './types'
+import { type Priority, type SecurityData, type Settings, type TemplateEvent } from './types'
 
 export const priorityOptions: Array<{ label: string; value: Priority }> = [
   { label: 'Minimum', value: 'min' },
@@ -11,13 +11,13 @@ export const priorityOptions: Array<{ label: string; value: Priority }> = [
 export const templateLabels: Record<TemplateEvent, string> = {
   post_published: 'Post published',
   login_success: 'Successful login',
-  login_failure: 'Failed login',
+  login_failure: 'Repeated failed logins',
 }
 
 export const templateDescriptions: Record<TemplateEvent, string> = {
   post_published: 'Send a notification when a post is published.',
   login_success: 'Send a notification when a user logs in successfully.',
-  login_failure: 'Send a notification when a login attempt fails.',
+  login_failure: 'Send a notification when per IP fail count reaches 10 over 60 minutes.',
 }
 
 export type NoticeState = {
@@ -63,10 +63,27 @@ export const emptySettings: Settings = {
     login_failure: {
       enabled: false,
       topic: 'wordpress-{site_slug}',
-      title: 'Failed WordPress login {username}',
-      message: 'Failed login attempt for {username} on {site_name} from {ip}.',
+      title: 'Repeated WordPress login failures from {ip}',
+      message:
+        '{failure_count} failed logins were recorded from {ip} within {window_minutes} minutes on {site_name}.\nLatest username {username}\nTime {time}\nUser Agent {user_agent}',
       priority: 'high',
       tags: 'warning',
     },
   },
+}
+
+export const emptySecurity: SecurityData = {
+  alert_threshold: 10,
+  alerts_enabled: false,
+  attempts: [],
+  current_ip: '',
+  ips: [],
+  retention_days: 90,
+  summary: {
+    attempts_last_hour: 0,
+    banned_ips: 0,
+    tracked_ips: 0,
+    whitelisted_ips: 0,
+  },
+  window_minutes: 60,
 }

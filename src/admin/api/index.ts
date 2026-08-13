@@ -1,6 +1,13 @@
 import apiFetch from '@wordpress/api-fetch'
 
-import { type Category, type SaveSettings, type Settings, type TestResponse } from '../types'
+import {
+  type Category,
+  type IpRuleAction,
+  type SaveSettings,
+  type SecurityData,
+  type Settings,
+  type TestResponse,
+} from '../types'
 
 const config = window.NTFY_ALERTS
 
@@ -29,6 +36,21 @@ export async function sendTest(): Promise<TestResponse> {
     path: route('/test'),
     method: 'POST',
   }) as Promise<TestResponse>
+}
+
+export async function getSecurity(): Promise<SecurityData> {
+  return apiFetch({
+    path: route('/security'),
+    method: 'GET',
+  }) as Promise<SecurityData>
+}
+
+export async function updateIpRule(ip: string, action: IpRuleAction): Promise<SecurityData> {
+  return apiFetch({
+    path: route('/security/ip'),
+    method: 'POST',
+    data: { ip, action },
+  }) as Promise<SecurityData>
 }
 
 export async function getCategories(): Promise<Category[]> {
