@@ -3,7 +3,7 @@
  * Plugin Name: Rubix Notify
  * Plugin URI: https://wordpress.org/plugins/rubix-notify
  * Description: Send WordPress login alerts and post announcements to dedicated ntfy topics using ntfy.sh or self-hosted ntfy.
- * Version: 1.2.0
+ * Version: 1.2.2
  * Author: Rubix Studios
  * Author URI: https://rubixstudios.com.au
  * License: GPLv2 or later
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 define('NTFY_FILE', __FILE__);
 define('NTFY_PATH', plugin_dir_path(NTFY_FILE));
 define('NTFY_URL', plugin_dir_url(NTFY_FILE));
-define('NTFY_VERSION', '1.2.0');
+define('NTFY_VERSION', '1.2.2');
 
 require_once NTFY_PATH . 'includes/class-crypto.php';
 require_once NTFY_PATH . 'includes/class-template.php';
