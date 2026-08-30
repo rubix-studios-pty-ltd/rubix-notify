@@ -11,15 +11,15 @@
     "update": "pnpm update --latest --recursive && pnpm install && pnpm prune && pnpm dedupe"
   },
   "dependencies": {
-    "@wordpress/api-fetch": "^7.53.0",
-    "@wordpress/components": "^39.0.0",
-    "@wordpress/element": "^8.5.0"
+    "@wordpress/api-fetch": "^7.54.0",
+    "@wordpress/components": "^40.0.0",
+    "@wordpress/element": "^8.6.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.10",
+    "@biomejs/biome": "2.5.11",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
-    "@wordpress/scripts": "^34.1.0",
+    "@wordpress/scripts": "^34.2.0",
     "copy-webpack-plugin": "^14.0.0",
     "typescript": "7.0.2"
   }
