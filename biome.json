@@ -17,7 +17,8 @@
       "!out",
       "!**/*.svg",
       "!**/*.png",
-      "!**/*.ico"
+      "!**/*.ico",
+      "!CHANGELOG.md"
     ]
   },
   "formatter": {
