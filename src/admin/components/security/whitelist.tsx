@@ -12,14 +12,14 @@ type Props = {
 }
 
 export function Whitelist({ alertThreshold, busyAction, currentIp, onRule, windowMinutes }: Props) {
-  const [whitelistIp, setWhitelistIp] = useState('')
-  const ip = whitelistIp.trim()
+  const [whitelist, setWhitelist] = useState('')
+  const ip = whitelist.trim()
 
   async function addWhitelist() {
     const updated = await onRule(ip, 'whitelist')
 
     if (updated) {
-      setWhitelistIp('')
+      setWhitelist('')
     }
   }
 
@@ -38,9 +38,9 @@ export function Whitelist({ alertThreshold, busyAction, currentIp, onRule, windo
       <CardBody style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="rx-rule-form">
           <TextControl
-            onChange={setWhitelistIp}
+            onChange={setWhitelist}
             placeholder="203.0.113.10 or 2001:db8::1"
-            value={whitelistIp}
+            value={whitelist}
           />
 
           <Button
