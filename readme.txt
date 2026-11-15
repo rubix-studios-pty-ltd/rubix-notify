@@ -5,7 +5,7 @@ Requires at least: 6.2
 Tested up to: 7.0
 Requires PHP: 7.4
 
-Stable tag: 1.2.2
+Stable tag: 1.2.3
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -89,6 +89,11 @@ To rebuild the compiled admin files:
 The public repository is provided so future maintainers, reviewers, and contributors can inspect, modify, and rebuild the react admin interface from source.
 
 == Changelog ==
+
+= 1.2.3 =
+* Improved security dashboard timestamps.
+* Added a fallback message for failed logins.
+* Updated the failed login alert description.
 
 = 1.2.2 =
 * Fixed missing files from release pipeline.
