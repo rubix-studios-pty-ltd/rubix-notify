@@ -1,7 +1,9 @@
 export function getError(errorCode: string): string {
-  if (!errorCode) {
+  const code = errorCode.trim()
+
+  if (!code) {
     return 'Authentication failed'
   }
 
-  return errorCode.replace(/_/g, ' ')
+  return code.replace(/_/g, ' ')
 }

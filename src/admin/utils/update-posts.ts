@@ -1,32 +1,25 @@
-import { emptySettings } from '../constants'
-import { type Post, postEvent, type Settings } from '../types'
+import { emptySettings, postEvent } from '../constants'
+import { type Post, type Settings } from '../types'
 
 export function updatePosts<K extends keyof Post>(
   settings: Settings,
   key: K,
   value: Post[K]
 ): Settings {
-  const post = settings.post ?? []
+  let updated = false
 
-  const hasAllPost = post.some((item) => item.event_key === postEvent && item.rule_type === 'all')
+  const post = (settings.post ?? []).map((item) => {
+    if (item.event_key !== postEvent || item.rule_type !== 'all') {
+      return item
+    }
 
-  return {
-    ...settings,
-    post: hasAllPost
-      ? post.map((item) =>
-          item.event_key === postEvent && item.rule_type === 'all'
-            ? {
-                ...item,
-                [key]: value,
-              }
-            : item
-        )
-      : [
-          ...post,
-          {
-            ...emptySettings.post[0],
-            [key]: value,
-          },
-        ],
+    updated = true
+    return { ...item, [key]: value }
+  })
+
+  if (!updated) {
+    post.push({ ...emptySettings.post[0], [key]: value })
   }
+
+  return { ...settings, post }
 }

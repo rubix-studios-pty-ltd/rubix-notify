@@ -6,10 +6,6 @@ export type PostType = 'all' | 'taxonomy_term'
 
 export type TemplateEvent = 'login_success' | 'login_failure' | 'post_published'
 
-export const postEvent = 'post_published'
-
-export const templateEvents: TemplateEvent[] = ['login_success', 'login_failure', 'post_published']
-
 export interface NtfyConfig {
   namespace: string
   nonce: string
@@ -65,6 +61,11 @@ export interface Template {
 export interface TestResponse {
   message: string
   success: boolean
+}
+
+export type NoticeState = {
+  status: 'success' | 'error'
+  message: string
 }
 
 export type IpRuleAction = 'ban' | 'unban' | 'whitelist' | 'remove_whitelist'

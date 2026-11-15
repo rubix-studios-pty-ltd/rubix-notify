@@ -1,6 +1,7 @@
-import { postEvent, type Settings } from '../types'
+import { postEvent } from '../constants'
+import { type Settings } from '../types'
 
-export function addPostCategory(settings: Settings): Settings {
+export function appendCategory(settings: Settings): Settings {
   return {
     ...settings,
     post: [

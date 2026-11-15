@@ -6,15 +6,12 @@ export function updatePost<K extends keyof Post>(
   key: K,
   value: Post[K]
 ): Settings {
+  const post = settings.post ?? []
+
   return {
     ...settings,
-    post: (settings.post ?? []).map((item, currentIndex) =>
-      currentIndex === index
-        ? {
-            ...item,
-            [key]: value,
-          }
-        : item
+    post: post.map((item, currentIndex) =>
+      currentIndex === index ? { ...item, [key]: value } : item
     ),
   }
 }

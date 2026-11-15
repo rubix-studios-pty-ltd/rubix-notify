@@ -23,28 +23,28 @@ import {
 import {
   emptySecurity,
   emptySettings,
-  type NoticeState,
+  postEvent,
   priorityOptions,
   templateDescriptions,
+  templateEvents,
   templateLabels,
 } from '../constants'
 import {
   type Category,
   type IpRuleAction,
+  type NoticeState,
   type Priority,
-  postEvent,
   type Settings,
   type TemplateEvent,
-  templateEvents,
 } from '../types'
-import { addPostCategory } from '../utils/add-category'
+import { appendCategory } from '../utils/append-category'
 import { getPosts } from '../utils/get-posts'
 import { removePost } from '../utils/remove-post'
 import { updatePost } from '../utils/update-post'
 import { updatePosts } from '../utils/update-posts'
 import { updateSetting } from '../utils/update-settings'
 import { updateTemplate } from '../utils/update-template'
-import { SecurityPanel } from './security'
+import { Security } from './security'
 
 export function App() {
   const [settings, setSettings] = useState<Settings>(emptySettings)
@@ -98,7 +98,7 @@ export function App() {
   }
 
   function addCategory() {
-    setSettings((current) => addPostCategory(current))
+    setSettings((current) => appendCategory(current))
   }
 
   function setPost<K extends keyof ReturnType<typeof getPosts>>(
@@ -289,7 +289,7 @@ export function App() {
                 </CardBody>
               </Card>
             ) : tab.name === 'security' ? (
-              <SecurityPanel
+              <Security
                 busyAction={securityAction}
                 data={security}
                 loading={securityLoading}

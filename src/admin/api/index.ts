@@ -16,66 +16,61 @@ apiFetch.use(apiFetch.createNonceMiddleware(config.nonce))
 
 const route = (path: string) => `/${config.namespace}${path}`
 
-export async function getSettings(): Promise<Settings> {
-  return apiFetch({
+export function getSettings(): Promise<Settings> {
+  return apiFetch<Settings>({
     path: route('/settings'),
     method: 'GET',
-  }) as Promise<Settings>
+  })
 }
 
-export async function saveSettings(payload: SaveSettings): Promise<Settings> {
-  return apiFetch({
+export function saveSettings(payload: SaveSettings): Promise<Settings> {
+  return apiFetch<Settings>({
     path: route('/settings'),
     method: 'POST',
     data: payload,
-  }) as Promise<Settings>
+  })
 }
 
-export async function sendTest(): Promise<TestResponse> {
-  return apiFetch({
+export function sendTest(): Promise<TestResponse> {
+  return apiFetch<TestResponse>({
     path: route('/test'),
     method: 'POST',
-  }) as Promise<TestResponse>
+  })
 }
 
-export async function getSecurity(): Promise<SecurityData> {
-  return apiFetch({
-    path: route('/security'),
-    method: 'GET',
-  }) as Promise<SecurityData>
+export function getSecurity(): Promise<SecurityData> {
+  return apiFetch<SecurityData>({ path: route('/security') })
 }
 
-export async function updateIpRule(ip: string, action: IpRuleAction): Promise<SecurityData> {
-  return apiFetch({
+export function updateIpRule(ip: string, action: IpRuleAction): Promise<SecurityData> {
+  return apiFetch<SecurityData>({
     path: route('/security/ip'),
     method: 'POST',
     data: { ip, action },
-  }) as Promise<SecurityData>
+  })
 }
 
 export async function getCategories(): Promise<Category[]> {
   const categories: Category[] = []
   let page = 1
-  let totalPages = 1
+  let total = 1
 
   do {
-    const response = (await apiFetch({
+    const response = await apiFetch({
       path: `/wp/v2/categories?per_page=100&page=${page}&hide_empty=false&orderby=name&order=asc`,
-      method: 'GET',
       parse: false,
-    })) as Response
+    })
 
     if (!response.ok) {
       throw new Error('Unable to load categories.')
     }
 
-    const result = (await response.json()) as Category[]
-
+    const result: Category[] = await response.json()
     categories.push(...result)
 
-    totalPages = Number.parseInt(response.headers.get('X-WP-TotalPages') ?? '1', 10)
+    total = Number.parseInt(response.headers.get('X-WP-TotalPages') ?? '1', 10)
     page += 1
-  } while (page <= totalPages)
+  } while (page <= total)
 
   return categories
 }

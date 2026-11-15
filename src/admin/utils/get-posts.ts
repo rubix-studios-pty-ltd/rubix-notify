@@ -4,9 +4,9 @@ import { type Post, type Settings } from '../types'
 export const postEvent = 'post_published' as const
 
 export function getPosts(settings: Settings): Post {
-  return (
-    (settings.post ?? []).find(
-      (post) => post.event_key === postEvent && post.rule_type === 'all'
-    ) ?? emptySettings.post[0]
+  const rule = settings.post?.find(
+    (post) => post.event_key === postEvent && post.rule_type === 'all'
   )
+
+  return rule ?? emptySettings.post[0]
 }

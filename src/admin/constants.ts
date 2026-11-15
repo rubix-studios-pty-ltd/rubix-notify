@@ -1,5 +1,9 @@
 import { type Priority, type SecurityData, type Settings, type TemplateEvent } from './types'
 
+export const postEvent = 'post_published'
+
+export const templateEvents: TemplateEvent[] = ['login_success', 'login_failure', 'post_published']
+
 export const priorityOptions: Array<{ label: string; value: Priority }> = [
   { label: 'Minimum', value: 'min' },
   { label: 'Low', value: 'low' },
@@ -17,12 +21,7 @@ export const templateLabels: Record<TemplateEvent, string> = {
 export const templateDescriptions: Record<TemplateEvent, string> = {
   post_published: 'Send a notification when a post is published.',
   login_success: 'Send a notification when a user logs in successfully.',
-  login_failure: 'Send a notification when per IP fail count reaches 10 over 60 minutes.',
-}
-
-export type NoticeState = {
-  status: 'success' | 'error'
-  message: string
+  login_failure: 'Send a notification when an IP address reaches the failed threshold.',
 }
 
 export const emptySettings: Settings = {
