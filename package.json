@@ -21,6 +21,6 @@
     "@types/react-dom": "^19.3.0",
     "@wordpress/scripts": "^37.1.0",
     "copy-webpack-plugin": "^14.0.0",
-    "typescript": "7.0.2"
+    "typescript": "^7.0.2"
   }
 }
