@@ -1,9 +1,9 @@
 import { Notice } from '@wordpress/components'
 
 import { type IpRuleAction, type SecurityData } from '../../types'
-import { Metric } from '../metric'
 import { Activity } from './activity'
 import { Attempts } from './attempts'
+import { Metric } from './metric'
 import { Whitelist } from './whitelist'
 
 type Props = {

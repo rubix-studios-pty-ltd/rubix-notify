@@ -1,6 +1,6 @@
 import { Button } from '@wordpress/components'
 
-import { type IpRuleAction, type SecurityIp } from '../types'
+import { type IpRuleAction, type SecurityIp } from '../../types'
 
 type Props = {
   busyAction: string

@@ -2,7 +2,7 @@ import { Button, Card, CardBody, CardHeader } from '@wordpress/components'
 
 import { type IpRuleAction, type SecurityData } from '../../types'
 import { formatGmt } from '../../utils/format-date'
-import { IpActions } from '../ip'
+import { IpActions } from './ip'
 
 type Props = {
   busyAction: string
